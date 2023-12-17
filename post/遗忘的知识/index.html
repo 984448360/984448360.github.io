@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>遗忘的知识 | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>遗忘的知识</h1>
+            <p class="article-meta">
+              2022-03-03
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge success">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <p>(1) 点乘和叉乘</p>
+<p>【点乘】:<br>
+定义：a·b=|a|·|b|cos&lt;a,b&gt; 【注：粗体小写字母表示向量，&lt;a,b&gt;表示向量a,b的夹角，取值范围为[0，180]】<br>
+几何意义：是一条边向另一条边的投影乘以另一条边的长度.<br>
+v1和v2向量的点乘运算：相应元素的乘积的和：v1( x1, y1，z1) * v2(x2, y2,z2) = (x1<em>x2) + (y1</em>y2) + (z1*z2);</p>
+<p>给定一个向量u和v，求u在v上的投影向量，如下图。<br>
+<img src="https://img.anqiqi.cn/file/cd7f3505c8178905c60e2.jpg" alt="" loading="lazy"><br>
+假设u在v上的投影向量是u’，且向量u和v的夹角为theta。一个向量有两个属性，大小和方向，我们先确定u’的大小（即长度，或者模），从u的末端做v的垂线，<br>
+那么d就是u’的长度。而u’和v的方向是相同的，v的方向v/|v|也就是u’的方向。<br>
+<img src="https://img.anqiqi.cn/file/abc996a2300f823723024.gif" alt="" loading="lazy"><br>
+再求d的长度。<br>
+<img src="https://img.anqiqi.cn/file/b784d8952ddd32acd2ee6.gif" alt="" loading="lazy"></p>
+<p>注意 : 结果不是一个向量，而是一个标量。<br>
+性质1： a<em>b = |a||b|Cos(θ) ，θ是向量a 和向量 b之间的夹角。<br>
+性质2： a</em>b = b*a  满足乘法交换律</p>
+<p>关于这里的计算需要插播一个点，当两个单位向量的长度都是1的时候，向量的点乘就是他们夹角的余弦值。在游戏开发中会有归一化的操作，然后直接求夹角的情况，如果对这个知识点没有了解，可能看不懂夹角计算的原理。<br>
+我们通过点积公式可以看出来a，b都是标量，都是正数，余弦值会根据角度有正负变化。<br>
+当(0-90)°的时候，余弦值是正数，整个点乘公式都是正的。<br>
+当90°的时候，余弦值为0，整个公式为0。<br>
+当(90-180)°的时候，余弦值是负数，整个公式为负的。<br>
+利用这个性质，我们可以根据点乘的正负，做一些判断了。</p>
+<p>Unity项目应用：<br>
+1.根据点乘计算两个向量的夹角。&lt;a,b&gt;= arccos(a·b / (|a|·|b|))<br>
+2.根据点乘的正负值，得到夹角大小范围，&gt;0，则夹角（0,90）&lt;0,则夹角（90,180），可以利用这点判断一个多边形是面向摄像机还是背向摄像机。<br>
+3.根据点乘的大小，得到向量的投影长度，反应了向量的长度关系。</p>
+<p>【叉乘】:<br>
+定义：c = a x b，其中a b c均为向量<br>
+几何意义是：得到一个与这两个向量都垂直的向量，这个向量的模是以两个向量为边的平行四边形的面积<br>
+推导<br>
+<img src="https://img.anqiqi.cn/file/79043d442fadb87acdfc9.jpg" alt="" loading="lazy"><br>
+v1和v2向量的叉乘运算：相应元素的乘积的和：v1( x1, y1，z1) x v2(x2, y2, z2) = {(y1<em>z2 - y2</em>z1),(x2<em>z1 - x1</em>z2),(x1<em>y2-x2</em>y1)};</p>
+<p>性质1：c⊥a，c⊥b，即向量c与向量a，b所在平面垂直<br>
+性质2：模长|c| = |a||b| sin&lt;a,b&gt;<br>
+性质3：(数学上)满足右手法则, a x b = -b x a，所以我们可以使用叉乘的正负值来判断a，b的相对位置，即b是处于a的顺时针还是逆时针方向。<br>
+叉乘的右手定则是用来确定叉乘积的方向的。</p>
+<p>Unity项目应用：<br>
+1.根据叉乘得到a，b向量的相对位置，和顺时针或逆时针方位。<br>
+2.得到a，b夹角的正弦值，计算向量的夹角（0,90），可以配合点乘和Angle方法计算出含正负的方向。<br>
+3.根据叉乘大小，得到a，b向量所形成的平行四边形的面积大小，根据面积大小得到向量的相对大小。</p>
+<p>简单的说: 点乘判断角度，叉乘判断方向。<br>
+形象的说: 当一个敌人在你身后的时候，叉乘可以判断你是往左转还是往右转更好的转向敌人，点乘得到你当前的面朝向的方向和你到敌人的方向的所成的角度大小。</p>
+<p>简单来说，在两个物体的位置关系判断中。<br>
+点乘可以判断出目标物体在我的前方还是后方。大于零在前方，小于零在后方。<br>
+叉乘可以判断出目标物体在我的左边还是右边。大于零在右方，小于零在左方。</p>
+<p>在计算机图形学中。<br>
+点乘可以用来计算夹角余弦值。<br>
+叉乘可以用来计算平面法向量。</p>
+<p>=<mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark>分割线</mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark>=<br>
+=<mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark>分割线</mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark>=<br>
+(2)Lua 原表<br>
+在 Lua table 中我们可以访问对应的 key 来得到 value 值，但是却无法对两个 table 进行操作(比如相加)。<br>
+因此 Lua 提供了元表(Metatable)，允许我们改变 table 的行为，每个行为关联了对应的元方法。<br>
+例如，使用元表我们可以定义 Lua 如何计算两个 table 的相加操作 a+b。<br>
+当 Lua 试图对两个表进行相加时，先检查两者之一是否有元表，之后检查是否有一个叫 __add 的字段，若找到，则调用对应的值。 __add 等即时字段，其对应的值（往往是一个函数或是 table）就是&quot;元方法&quot;。<br>
+有两个很重要的函数来处理元表：<br>
+setmetatable(table,metatable): 对指定 table 设置元表(metatable)，如果元表(metatable)中存在 __metatable 键值，setmetatable 会失败。<br>
+getmetatable(table): 返回对象的元表(metatable)。</p>
+<p>Lua table有一套hashmap的查找机制，如果访问一个表中并不存在的字段，不会立即返回nil，而是先触发一套查找机制，也是我们用以实现面向对象的方法。<br>
+简单的描述：元表就是用于查找的备用表。</p>
+<p>【构成类】:</p>
+<p>元方法  __index<br>
+简单的描述：是当table中一个元素不存在的时候，会触发寻找元表的__index元方法，如果不存在，则返回nil，如果存在，则返回结果。</p>
+<p>【只读不写表】:<br>
+1，利用元方法__newindex的特性（对字段进行赋值的时候如果表中没有则执行__newindex中的方法），新建一个空表代替原来的表，并对空表进行元方法重写实现table的相应功能。<br>
+这样对任何字段的修改，在空表中肯定都找不到，只能只能统一的入口方法__newindex，我们不处理就能实现只读。<br>
+2，再利用__index元方法保存原来的表， 因为取值的时候如果找不到就会去__index中取。</p>
+<pre><code class="language-lua">function const(t)
+    local temp = t --temp以upvalue的形式存储t
+    local ret = {}
+    local mt = {
+       --__index = t, 或者这样
+　　　　__index = function(t,k)
+　　　　　　return temp[k]
+　　　　end,
+　　　　__newindex = function()--空函数覆盖newindex
+
+　　　　end,
+
+　　　　__metatable = false,
+　　}
+　　setmetatable(ret,mt)
+　　return ret
+end
+</code></pre>
+<p>【table的 弱引用和强引用】:</p>
+<p>一.强引用table<br>
+lua中的table是引用类型，更准确地说，是强引用类型。如下第二段代码，在内存中有一个{name = &quot;123&quot;}的table，并用a和b[1]指向它，然后置空a，此时就只剩下b[1]指向它了。<br>
+这种引用方式和我们所认知的引用是一样的。值得一提的是，这里的a = nil为什么不等同于{name = &quot;123&quot;} = nil呢，意思是将指向的这个表删掉呢？<br>
+因为lua是具备自动内存管理的，我们只管创建，删除操作是lua自动进行的，因此这里的a = nil并不是删除表，而是指将a对这张表的引用去掉，当没有地方引用这张表时，这张表就会被lua自动清掉。</p>
+<pre><code class="language-lua">a = {name = &quot;123&quot;}
+b = a
+a.name = &quot;456&quot;
+print(b.name)--456
+
+
+a = {name = &quot;123&quot;}
+b = {}
+b[1] = a
+a = nil
+print(b[1].name)--123
+</code></pre>
+<p>二.弱引用table<br>
+如上所说，一般我们创建的table都是强引用table，即key和value都是强引用，强引用可以防止他们指向的对象被回收。如果一个对象存在强引用，那么它就不会被回收。而相对地，就有弱引用，弱引用不能防止对象被回收。<br>
+如果一个对象只存在弱引用，那么它就会 被回收。lua中通过弱引用table来实现弱引用。弱引用table有三种形式：<br>
+1.key值弱引用。设置方法为setmetatable(b, {__mode = &quot;k&quot;})<br>
+2.value值弱引用。设置方法为setmetatable(b, {__mode = &quot;v&quot;})<br>
+3.key和value值弱引用。设置方法为setmetatable(b, {__mode = &quot;kv&quot;})<br>
+当一个key或者value被收集时，整个key以及对应的value都会从table中移除。</p>
+<p>下面新增一句代码，表示b的value对其指向的对象的引用是弱引用，而b的key对其指向的对象的引用仍然是强引用(对于table来说，其key和value可以指向任何类型的对象，除了key不能指向nil)。<br>
+{name = &quot;123&quot;}这个table只存在弱应用b[1]，所以被回收。</p>
+<pre><code class="language-lua">a = {name = &quot;123&quot;}
+b = {}
+setmetatable(b, {__mode = &quot;v&quot;}) --add
+b[1] = a
+a = nil
+collectgarbage()
+for k,v in pairs(b) do
+    print(k) --无
+    print(v) --无
+end
+</code></pre>
+<p>=<mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark>分割线</mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark>=<br>
+=<mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark>分割线</mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark>=<br>
+(3)Unity协程原理</p>
+<p>使用过Unity的同学一定知道，Unity提供了一套协程机制，简直不要太好用。但是这个协程依赖于Unity引擎，离开Unity就无法使用。<br>
+那有没有办法实现不依赖Unity的协程呢？答案是当然阔以。 所谓实现一个协程，就是实现一个迭代器的容器！</p>
+<p>什么是IEnumerator</p>
+<p>在.NET中，迭代器模式被IEnumerator和IEnumerable及其对应的泛型接口所封装。如果一个类实现了IEnumerable接口，&quot;(那么就能够被迭代)&quot;；<br>
+调用GetEnumerator方法将返回IEnumerator接口的实现，它就是迭代器本身。迭代器类似数据库中的游标，他是数据序列中的一个位置记录。迭代器只能向前移动，同一数据序列中可以有多个迭代器同时对数据进行操作。<br>
+这个只能向前移动的特性就是我们协程需要用到的特性。所谓实现一个协程，就是实现一个迭代器的容器！<br>
+具体函数:</p>
+<pre><code class="language-c#">using System.Runtime.InteropServices;
+namespace System.Collections
+{
+    [ComVisible(true)]
+    public interface IEnumerator
+    {
+        object Current { get; } // 当前正在访问的对象，只读
+
+        bool MoveNext(); // 移动到下一个元素，我们的协程通过此函数来控制迭代器的到底要不要移动下一个代码段.如果迭代器返回false，则证明迭代器已经执行完毕，此时协程也应该执行完毕
+        void Reset(); // 重置函数
+    }
+}
+</code></pre>
+<p>总结：<br>
+就是线程通过调度器检测条件  使用 IEnumerator 中的MoveNext方法移动 和 yield让出权限</p>
+<p>=<mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark>分割线</mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark>=<br>
+=<mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark><mark>分割线</mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark></mark>=<br>
+(4)C# GC原理</p>
+<p>Ngui 裁剪原理<br>
+怎么把模型放到UI前<br>
+摄像机层级管理<br>
+怎么拆分模型实现边走边打<br>
+渲染管线流程<br>
+帧同步状态同步<br>
+弱联网<br>
+资源管理框架<br>
+数据结构<br>
+数组和列表</p>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">
+                <h3 class="post-title">
+                  UnityAB资源加密
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge warning">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge success">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge secondary">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge success">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge secondary">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge success">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge secondary">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge ">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge ">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge ">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge warning">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge secondary">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge success">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge ">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>

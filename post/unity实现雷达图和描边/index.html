@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>unity实现雷达图和描边 | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>unity实现雷达图和描边</h1>
+            <p class="article-meta">
+              2022-02-17
+              
+                <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge secondary">
+                  ngui
+                </a>
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <p>最近策划需要一个雷达战力图</p>
+<p>RadarChart.cs  有兴趣的自己看下</p>
+<pre><code class="language-c#">using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class RadarChart : MonoBehaviour
+{
+    private MeshRenderer mMeshRenderer = null;
+    private MeshFilter mMeshFilter = null;
+    private Material mMat = null;
+    private Mesh mMesh;
+
+    public Color mainColor = new Color(0.4f, 0.6f, 1f);
+    public Color outLineColor = new Color(1f, 1f, 1f, 0.3f);
+    public Color addColor = Color.white;
+    public float alpha = 0.3f;
+    
+
+    // 参数
+    private int VERTICES_COUNT; //网格模型顶点数量
+    public Vector3[] vertices;
+    private Vector3[] vec3OutLineList;
+    //三角形数组
+    int[] triangles;
+    public float scale;
+    public float radius = 45f;
+    public float outLineSize = 1f;
+    public GameObject obj;
+
+    public MeshRenderer meshRenderer
+	{
+		get
+		{
+			if (mMeshRenderer == null)
+			{
+				mMeshRenderer = GetComponent&lt;MeshRenderer&gt;();
+				if (mMeshRenderer == null)
+				{
+					mMeshRenderer = gameObject.AddComponent&lt;MeshRenderer&gt;();
+				}
+			}
+			return mMeshRenderer;
+		}
+	}
+
+    public MeshFilter meshFilter
+	{
+		get
+		{
+			if (mMeshFilter == null)
+			{
+				mMeshFilter = GetComponent&lt;MeshFilter&gt;();
+				if (mMeshFilter == null)
+				{
+					mMeshFilter = gameObject.AddComponent&lt;MeshFilter&gt;();
+				}
+			}
+			return mMeshFilter;
+		}
+	}
+
+    public Material material
+	{
+		get
+		{
+            if (mMat == null)
+			{
+				mMat = new Material(ShaderManager.instance.LoadShader(&quot;UI/ColorAdd&quot;, &quot;ColorAdd&quot;));
+                mMat.SetColor(&quot;_MainColor&quot;, mainColor);
+                mMat.SetColor(&quot;_AddColor&quot;, addColor);
+                mMat.SetFloat(&quot;_Alpha&quot;, alpha);
+			}
+			return mMat;
+		}
+	}
+
+    public Mesh mesh
+	{
+		get
+		{
+			if (mMesh == null)
+			{
+				mMesh = new Mesh();
+				mMesh.name = &quot;UIRadarChart&quot;;
+			}
+			return mMesh;
+		}
+	}
+    void Start()
+    {  
+        meshRenderer.material = material;
+        FillMeshRadarChart();
+    }
+
+    void Update()
+	{
+		//UpdateRadarChart();
+	}
+
+    float GetRadians(float angle)
+    {
+        return Mathf.PI / 180 * angle;
+    }
+
+    void FillMeshRadarChart()
+    {
+        if (!Application.isPlaying)
+		{
+			return;
+		}
+        
+        VERTICES_COUNT = vertices.Length;
+        int triangles_count = VERTICES_COUNT - 1;
+
+        triangles = new int[triangles_count * 3];
+
+        //设定原点坐标
+        vertices[0] = new Vector3(0, 0, 1);
+        //首个在x轴上的坐标点
+        vertices[1] = new Vector3(radius, 0, 1);
+
+        //每个三角形角度
+        float everyAngle = 360 / triangles_count;
+        for (int i = 2; i &lt; vertices.Length; i++)
+        {
+            var angle = GetRadians(everyAngle * (i - 1));
+            vertices[i] = new Vector3(radius * Mathf.Cos(angle), radius * Mathf.Sin(angle), 1);
+        }
+
+        int idx = 0;
+        int value = 0;
+        for (int i = 0; i &lt; triangles.Length; i++)
+        {
+            if (i % 3 == 0)
+            {
+                triangles[i] = 0;
+                value = idx;
+                idx++;
+            }
+            else
+            {
+                value++;
+                if (value == VERTICES_COUNT)
+                    value = 1;
+                    
+                triangles[i] = value;
+            }
+        }
+        UpdateRadarChart();
+    }
+
+    void DrawOutLine()
+    {
+        //obj.transform.localPosition = new Vector3(0, 0, -1);
+        MeshFilter mf = obj.GetComponent&lt;MeshFilter&gt;();
+        if (mf == null)
+        {
+            mf = obj.AddComponent&lt;MeshFilter&gt;();
+        }
+
+        MeshRenderer mr = obj.GetComponent&lt;MeshRenderer&gt;();
+        if (mr == null)
+        {
+            mr = obj.AddComponent&lt;MeshRenderer&gt;();
+        }
+        
+        Material mat = new Material(ShaderManager.instance.LoadShader(&quot;UI/ColorAdd&quot;, &quot;ColorAdd&quot;));
+        mat.SetColor(&quot;_MainColor&quot;, outLineColor);
+        mr.material = mat;
+        Mesh meshOut = new Mesh();
+        meshOut.vertices = vec3OutLineList;
+        meshOut.triangles = triangles;
+        mf.mesh = meshOut;
+    }
+
+    Vector2 GetPreVec(int index)
+    {
+        int tmpIndex = (index - 1) &lt; 1 ? vertices.Length - 1 : (index - 1);
+        return new Vector2(vertices[tmpIndex].x, vertices[tmpIndex].y);
+    }
+
+    Vector2 GetCurVec(int index)
+    {
+        return new Vector2(vertices[index].x, vertices[index].y);
+    }
+
+    Vector2 GetNextVec(int index)
+    {
+        int tmpIndex = (index + 1) &gt;= vertices.Length ? 1 : index + 1;
+        return new Vector2(vertices[tmpIndex].x, vertices[tmpIndex].y);
+    }
+
+    Vector2 GetNormal(Vector2 dir)
+    {
+        return new Vector2(dir.y, -dir.x);
+    }
+
+    Vector3 GetIntersect(Vector2 s1, Vector2 d1, Vector2 s2, Vector2 d2)
+    {
+        Vector2 e1 = s1 + d1;
+        Vector2 e2 = s2 + d2;
+
+        float a1, a2, b1, b2, c1, c2;
+
+        a1 = e1.y - s1.y;
+        b1 = s1.x - e1.x;
+        c1 = (e1.x * s1.y) - (s1.x * e1.y);
+
+        a2 = e2.y - s2.y;
+        b2 = s2.x - e2.x;
+        c2 = (e2.x * s2.y) - (s2.x * e2.y);
+
+        float c = (a1 * b2 - a2 * b1);
+
+        float x = (b1 * c2 - b2 * c1) / c;
+        float y = (a2 * c1 - a1 * c2) / c;
+
+        return new Vector3(x, y, 0);
+    }
+
+    void UpdateRadarChart()
+    {
+        Vector3[] tmps = new Vector3[vertices.Length];
+        Vector3[] tmpo = new Vector3[vertices.Length];
+        
+        float lineWidth = outLineSize;
+        Vector2 cur, next, pre, da, db, na, nb;
+        for (int i = 0; i &lt; vertices.Length; i++)
+        {
+            tmps[i] = vertices[i] * vertices[i].z * scale;
+
+            // 描边顶点
+            cur = GetCurVec(i);
+            next = GetNextVec(i);
+            pre = GetPreVec(i);
+            da = (cur - pre).normalized;
+            db = (cur - next).normalized;
+            na = GetNormal(da);
+            nb = GetNormal(-db);
+            tmpo[i] = this.GetIntersect(pre + (na * lineWidth), da, next + (nb * lineWidth), db);
+        }
+        // 描边顶点
+        vec3OutLineList = tmpo;
+        DrawOutLine();
+        // 正常顶点
+        mesh.vertices = tmps;
+        mesh.triangles = triangles;
+        meshFilter.mesh = mesh;
+
+        
+    }
+}
+
+</code></pre>
+<p>或者可以弄个纹理贴图</p>
+<pre><code class="language-c#">using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+[ExecuteInEditMode]
+public class WuJiaoXingRender : MonoBehaviour
+{
+    public static Vector3 posC = new Vector3(0, 0, 0);        //中心
+    public static Vector3 pos1 = new Vector3(0, 1, 0);        //最上
+    public static Vector3 pos2 = new Vector3(1f, 0.236f, 0);  //右上
+    public static Vector3 pos3 = new Vector3(0.627f, -1f, 0);   //右下
+    public static Vector3 pos4 = new Vector3(-0.627f, -1f, 0);  //左下
+    public static Vector3 pos5 = new Vector3(-1f, 0.236f, 0); //左上
+
+    public static Vector2 uvC = new Vector2(0.5f, 0.5f);      //中心 
+    public static Vector2 uv1 = new Vector2(0.5f, 1f);        //最上
+    public static Vector2 uv2 = new Vector2(1f, 1 - 0.38f);       //右上
+    public static Vector2 uv3 = new Vector2(0.8f, 1 - 1);         //右下
+    public static Vector2 uv4 = new Vector2(0.2f, 1 - 1);         //左下
+    public static Vector2 uv5 = new Vector2(0f, 1 - 0.38f);       //左上
+
+    private bool isInit = false;
+
+    public Texture2D texture;                   //五角星贴图
+    [Range(0.1f,1)]
+    public float rate1 = 1f;
+    [Range(0.1f, 1)]
+    public float rate2 = 1f;
+    [Range(0.1f, 1)]
+    public float rate3 = 1f;
+    [Range(0.1f, 1)]
+    public float rate4 = 1f;
+    [Range(0.1f, 1)]
+    public float rate5 = 1f;
+
+    private MeshFilter meshFilter;
+    private MeshRenderer meshRender;
+    private Mesh mesh;
+
+    private Vector2[] uvs = new Vector2[15];
+    private Vector3[] verts = new Vector3[15];
+    private int[] indexes = new int[15];
+    private Color[] colors = new Color[15];
+
+    private Vector2[] initUvs = new Vector2[15];
+    private Vector3[] initVerts = new Vector3[15];
+
+    // Use this for initialization
+    void Start()
+    {
+        if (isInit)
+            return;
+        if (meshFilter == null)
+            meshFilter = this.gameObject.AddComponent&lt;MeshFilter&gt;();
+        if (mesh == null)
+        {
+            CreateMesh();
+            meshFilter.sharedMesh = mesh;
+        }
+        meshRender = this.gameObject.AddComponent&lt;MeshRenderer&gt;();
+        meshRender.sharedMaterial = new Material(Shader.Find(&quot;Unlit/WuJiaoXingRender&quot;));
+        meshRender.sharedMaterial.SetTexture(&quot;_MainTex&quot;, texture);
+        isInit = true;
+    }
+
+
+
+#if UNITY_EDITOR
+    [ContextMenu(&quot;CreateEditor&quot;)]
+    private void CreateEditor()
+    {
+        Start();
+    }
+#endif
+
+    private void CreateMesh()
+    {
+        verts[0] = pos1;
+        verts[1] = pos2;
+        verts[2] = posC;
+
+        verts[3] = pos2;
+        verts[4] = pos3;
+        verts[5] = posC;
+
+        verts[6] = pos3;
+        verts[7] = pos4;
+        verts[8] = posC;
+
+        verts[9] = pos4;
+        verts[10] = pos5;
+        verts[11] = posC;
+
+        verts[12] = pos5;
+        verts[13] = pos1;
+        verts[14] = posC;
+
+        uvs[0] = uv1;
+        uvs[1] = uv2;
+        uvs[2] = uvC;
+
+        uvs[3] = uv2;
+        uvs[4] = uv3;
+        uvs[5] = uvC;
+
+        uvs[6] = uv3;
+        uvs[7] = uv4;
+        uvs[8] = uvC;
+
+        uvs[9] = uv4;
+        uvs[10] = uv5;
+        uvs[11] = uvC;
+
+        uvs[12] = uv5;
+        uvs[13] = uv1;
+        uvs[14] = uvC;
+
+        for (int i = 0; i &lt; 15; i++)
+        {
+            initUvs[i] = uvs[i];
+            initVerts[i] = verts[i];
+            colors[i] = Color.red;
+            indexes[i] = i;
+        }
+
+        mesh = new Mesh();
+        mesh.name = &quot;WuJiaoXingRender&quot;;
+        mesh.vertices = verts;
+        mesh.colors = colors;
+        mesh.uv = uvs;
+        mesh.SetTriangles(indexes, 0);
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (!isInit)
+            return;
+
+        updateRate(0, rate1);
+        updateRate(1, rate2);
+        updateRate(2, rate3);
+        updateRate(3, rate4);
+        updateRate(4, rate5);
+    }
+
+    private void updateRate(int index, float rate)
+    {
+        int outIndex1 = index * 3;
+        int outIndex2 = index * 3 - 2;
+        if (outIndex2 &lt; 0)
+        {
+            outIndex2 += 15;
+        }
+        Vector3 pos = initVerts[outIndex1];
+        pos *= rate;
+        verts[outIndex1] = pos;
+        pos = initVerts[outIndex2];
+        pos *= rate;
+        verts[outIndex2] = pos;
+        mesh.vertices = verts;
+    }
+}
+
+
+</code></pre>
+<p>可以参考下 我写了个粗糙版</p>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">
+                <h3 class="post-title">
+                  NGUI图片变灰通用
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge success">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge ">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge secondary">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge ">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge warning">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge success">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge secondary">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge ">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge ">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge ">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge success">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge success">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge warning">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge warning">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>

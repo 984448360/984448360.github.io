@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>unity新手指引和ngui点击问题 | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>unity新手指引和ngui点击问题</h1>
+            <p class="article-meta">
+              2021-12-13
+              
+                <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge secondary">
+                  ngui
+                </a>
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge success">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <p>最近项目需要写新手指引,不行随便写个耦合很高的。<br>
+但是我们用的ngui 没有点击穿透这一说，这就很尴尬了。但是作为一个面向搜索引擎的程序员这有啥怕；<br>
+网上我看到了一个方案 把屏幕用4个矩形分开只剩下中间的能点击的部分没有矩形 其他地方加上box。 但是我觉很不友好，突然面向搜索引擎 又发力了<br>
+第二个方案用的meshCollider（网格碰撞器） 顺便还有大神写了个轮子 下面我们展示代码</p>
+<p>UIMaskWidget.cs  有兴趣的自己看下</p>
+<pre><code class="language-c#">using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+
+public class UIMaskWidget : UIWidget
+{
+	[SerializeField, HideInInspector] Texture mTexture;
+	[SerializeField, HideInInspector] Shader mShader;
+	[SerializeField, HideInInspector] bool mSliced;
+	[SerializeField, HideInInspector] Vector4 mBorder;
+
+	private MeshCollider mMeshCollider = null;
+	private Mesh mColliderMesh;
+	private Vector3[] mColliderMeshVertices = new Vector3[8];
+	private int[] mColliderMeshTriangles = new int[24];
+	private Texture mSpareTexture;
+    //private Material mMat = null;
+	public override Texture mainTexture
+	{
+		get
+		{
+			if (mMat != null)
+			{
+				return mMat.mainTexture;
+			}
+			if (mTexture == null)
+			{
+				return spareTexture;
+			}
+			return mTexture;
+		}
+		set
+		{
+			if (mTexture != value)
+			{
+				if (drawCall != null &amp;&amp; drawCall.widgetCount == 1 &amp;&amp; mMat == null)
+				{
+					mTexture = value;
+					drawCall.mainTexture = value;
+				}
+				else
+				{
+					RemoveFromPanel();
+					mTexture = value;
+					MarkAsChanged();
+				}
+			}
+		}
+	}
+
+	public override Material material
+	{
+		get
+		{
+			return mMat;
+		}
+		set
+		{
+
+		}
+	}
+
+	public override Shader shader
+	{
+		get
+		{
+			if (mMat != null) return mMat.shader;
+			if (mShader == null) mShader = Shader.Find(&quot;Unlit/Transparent Colored&quot;);
+			return mShader;
+		}
+		set
+		{
+
+		}
+	}
+
+	public override Vector4 border
+	{
+		get
+		{
+			return mBorder;
+		}
+		set
+		{
+			if (mBorder != value)
+			{
+				mBorder = value;
+				MarkAsChanged();
+			}
+		}
+	}
+
+	public MeshCollider meshCollider
+	{
+		get
+		{
+			if (mMeshCollider == null)
+			{
+				mMeshCollider = GetComponent&lt;MeshCollider&gt;();
+				if (mMeshCollider == null)
+				{
+					mMeshCollider = gameObject.AddComponent&lt;MeshCollider&gt;();
+				}
+			}
+			return mMeshCollider;
+		}
+	}
+
+	public Mesh colliderMesh
+	{
+		get
+		{
+			if (mColliderMesh == null)
+			{
+				mColliderMesh = new Mesh();
+				mColliderMesh.name = &quot;UIMaskWidget&quot;;
+				mColliderMesh.vertices = mColliderMeshVertices;
+
+				for (int i = 0; i &lt; 4; i++)
+				{
+					int index = i * 6;
+
+					mColliderMeshTriangles[index] = i;
+					mColliderMeshTriangles[index + 2] = (i + 5) &gt; 7 ? i + 1 : i + 5;
+					mColliderMeshTriangles[index + 1] = i + 4;
+
+					mColliderMeshTriangles[index + 3] = i;
+					mColliderMeshTriangles[index + 5] = (i + 1) &gt; 3 ? i - 3 : i + 1;
+					mColliderMeshTriangles[index + 4] = (i + 5) &gt; 7 ? i + 1 : i + 5;
+				}
+				mColliderMesh.triangles = mColliderMeshTriangles;
+			}
+			return mColliderMesh;
+		}
+	}
+
+	public bool isTextureNull
+	{
+		get
+		{
+			return mTexture == null;
+		}
+	}
+
+	public bool isSliced
+	{
+		get
+		{
+			return mSliced;
+		}
+		set
+		{
+			if (mSliced != value)
+			{
+				mSliced = value;
+				MarkAsChanged();
+			}
+		}
+	}
+
+	private Texture spareTexture
+	{
+		get
+		{
+			if (mSpareTexture == null)
+			{
+				Texture2D tex = new Texture2D(1, 1);
+				tex.name = &quot;UIMaskWidget&quot;;
+				tex.SetPixel(0, 0, Color.white);
+				tex.Apply();
+				mSpareTexture = tex;
+			}
+			return mSpareTexture;
+		}
+	}
+	
+	protected override void OnUpdate()
+	{
+		base.OnUpdate();
+		MarkAsChanged();
+	}
+
+	public override void OnFill(List&lt;Vector3&gt; verts, List&lt;Vector2&gt; uvs, List&lt;Color&gt; cols)
+	{
+		if (mainTexture == null)
+		{
+			return;
+		}
+		Fill(verts, uvs, cols);
+	}
+
+    void Fill(List&lt;Vector3&gt; verts, List&lt;Vector2&gt; uvs, List&lt;Color&gt; cols)
+	{
+        if (root == null)
+            return;
+
+		verts.Clear();
+		Vector3 innerLB = new Vector3(width * -pivotOffset.x, height * -pivotOffset.y, 0);
+		Vector3 innerRT = new Vector3(width * (1 - pivotOffset.x), height * (1 - pivotOffset.y), 0);
+		Vector3 windowHalfSize = new Vector3(NGUITools.screenSize.x, NGUITools.screenSize.y, 0) * 0.5f;
+        //Vector3 windowHalfSize = new Vector3(1280, 720, 0) * 0.5f;
+		Vector3 outerLB = transform.InverseTransformPoint(root.transform.TransformPoint(-windowHalfSize));
+		Vector3 outerRT = transform.InverseTransformPoint(root.transform.TransformPoint(windowHalfSize));
+		float[] vxs = new float[4] { outerLB.x, innerLB.x, innerRT.x, outerRT.x };
+		float[] vys = new float[4] { outerLB.y, innerLB.y, innerRT.y, outerRT.y };
+		// Rectangle LB
+		verts.Add(new Vector3(vxs[0], vys[0], 0));
+		verts.Add(new Vector3(vxs[0], vys[1], 0));
+		verts.Add(new Vector3(vxs[1], vys[1], 0));
+		verts.Add(new Vector3(vxs[1], vys[0], 0));
+		// Rectangle CB
+		verts.Add(new Vector3(vxs[1], vys[0], 0));
+		verts.Add(new Vector3(vxs[1], vys[1], 0));
+		verts.Add(new Vector3(vxs[2], vys[1], 0));
+		verts.Add(new Vector3(vxs[2], vys[0], 0));
+		// Rectangle RB
+		verts.Add(new Vector3(vxs[2], vys[0], 0));
+		verts.Add(new Vector3(vxs[2], vys[1], 0));
+		verts.Add(new Vector3(vxs[3], vys[1], 0));
+		verts.Add(new Vector3(vxs[3], vys[0], 0));
+		// Rectangle LC
+		verts.Add(new Vector3(vxs[0], vys[1], 0));
+		verts.Add(new Vector3(vxs[0], vys[2], 0));
+		verts.Add(new Vector3(vxs[1], vys[2], 0));
+		verts.Add(new Vector3(vxs[1], vys[1], 0));
+		// Rectangle RC
+		verts.Add(new Vector3(vxs[2], vys[1], 0));
+		verts.Add(new Vector3(vxs[2], vys[2], 0));
+		verts.Add(new Vector3(vxs[3], vys[2], 0));
+		verts.Add(new Vector3(vxs[3], vys[1], 0));
+		// Rectangle LT
+		verts.Add(new Vector3(vxs[0], vys[2], 0));
+		verts.Add(new Vector3(vxs[0], vys[3], 0));
+		verts.Add(new Vector3(vxs[1], vys[3], 0));
+		verts.Add(new Vector3(vxs[1], vys[2], 0));
+		// Rectangle CT
+		verts.Add(new Vector3(vxs[1], vys[2], 0));
+		verts.Add(new Vector3(vxs[1], vys[3], 0));
+		verts.Add(new Vector3(vxs[2], vys[3], 0));
+		verts.Add(new Vector3(vxs[2], vys[2], 0));
+		// Rectangle RT
+		verts.Add(new Vector3(vxs[2], vys[2], 0));
+		verts.Add(new Vector3(vxs[2], vys[3], 0));
+		verts.Add(new Vector3(vxs[3], vys[3], 0));
+		verts.Add(new Vector3(vxs[3], vys[2], 0));
+
+		uvs.Clear();
+		float[] uxs, uys;
+		if (isSliced)
+		{
+			Vector2 texSizeR = new Vector2(1f / mainTexture.width, 1f / mainTexture.height);
+			uxs = new float[4] { 0, border.x * texSizeR.x, 1 - border.z * texSizeR.x, 1 };
+			uys = new float[4] { 0, border.y * texSizeR.y, 1 - border.w * texSizeR.y, 1 };
+		}
+		else
+		{
+			Vector2 screenSizeR = new Vector2(1f / (vxs[3] - vxs[0]), 1f / (vys[3] - vys[0]));
+			uxs = new float[4] { 0, (vxs[1] - vxs[0]) * screenSizeR.x, (vxs[2] - vxs[0]) * screenSizeR.x, 1 };
+			uys = new float[4] { 0, (vys[1] - vys[0]) * screenSizeR.y, (vys[2] - vys[0]) * screenSizeR.y, 1 };
+		}
+		// Rectangle LB
+		uvs.Add(new Vector3(uxs[0], uys[0], 0));
+		uvs.Add(new Vector3(uxs[0], uys[1], 0));
+		uvs.Add(new Vector3(uxs[1], uys[1], 0));
+		uvs.Add(new Vector3(uxs[1], uys[0], 0));
+		// Rectangle CB
+		uvs.Add(new Vector3(uxs[1], uys[0], 0));
+		uvs.Add(new Vector3(uxs[1], uys[1], 0));
+		uvs.Add(new Vector3(uxs[2], uys[1], 0));
+		uvs.Add(new Vector3(uxs[2], uys[0], 0));
+		// Rectangle RB
+		uvs.Add(new Vector3(uxs[2], uys[0], 0));
+		uvs.Add(new Vector3(uxs[2], uys[1], 0));
+		uvs.Add(new Vector3(uxs[3], uys[1], 0));
+		uvs.Add(new Vector3(uxs[3], uys[0], 0));
+		// Rectangle LC
+		uvs.Add(new Vector3(uxs[0], uys[1], 0));
+		uvs.Add(new Vector3(uxs[0], uys[2], 0));
+		uvs.Add(new Vector3(uxs[1], uys[2], 0));
+		uvs.Add(new Vector3(uxs[1], uys[1], 0));
+		// Rectangle RC
+		uvs.Add(new Vector3(uxs[2], uys[1], 0));
+		uvs.Add(new Vector3(uxs[2], uys[2], 0));
+		uvs.Add(new Vector3(uxs[3], uys[2], 0));
+		uvs.Add(new Vector3(uxs[3], uys[1], 0));
+		// Rectangle LT
+		uvs.Add(new Vector3(uxs[0], uys[2], 0));
+		uvs.Add(new Vector3(uxs[0], uys[3], 0));
+		uvs.Add(new Vector3(uxs[1], uys[3], 0));
+		uvs.Add(new Vector3(uxs[1], uys[2], 0));
+		// Rectangle CT
+		uvs.Add(new Vector3(uxs[1], uys[2], 0));
+		uvs.Add(new Vector3(uxs[1], uys[3], 0));
+		uvs.Add(new Vector3(uxs[2], uys[3], 0));
+		uvs.Add(new Vector3(uxs[2], uys[2], 0));
+		// Rectangle RT
+		uvs.Add(new Vector3(uxs[2], uys[2], 0));
+		uvs.Add(new Vector3(uxs[2], uys[3], 0));
+		uvs.Add(new Vector3(uxs[3], uys[3], 0));
+		uvs.Add(new Vector3(uxs[3], uys[2], 0));
+
+		cols.Clear();
+		for (int i = 0; i &lt; 32; i++)
+		{
+			cols.Add(color);
+		}
+
+		FillMeshCollider(vxs, vys);
+	}
+
+	void FillMeshCollider(float[] vxs, float[] vys)
+	{
+		if (!Application.isPlaying)
+		{
+			return;
+		}
+		mColliderMeshVertices[0] = new Vector3(vxs[0], vys[0], 0);
+		mColliderMeshVertices[1] = new Vector3(vxs[3], vys[0], 0);
+		mColliderMeshVertices[2] = new Vector3(vxs[3], vys[3], 0);
+		mColliderMeshVertices[3] = new Vector3(vxs[0], vys[3], 0);
+
+		mColliderMeshVertices[4] = new Vector3(vxs[1], vys[1], 0);
+		mColliderMeshVertices[5] = new Vector3(vxs[2], vys[1], 0);
+		mColliderMeshVertices[6] = new Vector3(vxs[2], vys[2], 0);
+		mColliderMeshVertices[7] = new Vector3(vxs[1], vys[2], 0);
+
+		colliderMesh.vertices = mColliderMeshVertices;
+		meshCollider.sharedMesh = mColliderMesh;
+	}
+}
+
+</code></pre>
+<p>继续显示我们的自己的逻辑<br>
+由于我想写个基本由策划自己配置就行的指引不需要程序自己操心的！！！ 哈哈哈<br>
+就想到了给按钮BOX加委托  下面是我们自己的逻辑</p>
+<p>GuideData.lua</p>
+<pre><code class="language-lua">-- 新手指引
+module ('m__' .. ..., package.seeall)
+local GuideData = newClass(&quot;GuideData&quot;, BaseData)
+function GuideData:Init()
+
+    self:ConstructMember()
+    self:InitMember()
+end
+
+function GuideData:Clear()
+    
+end
+
+function GuideData:ConstructMember()
+
+    self.m_stepCfg = {}             -- 按照大阶段的数据
+    self.m_stepIndex = 0            -- 主步骤
+    self.m_subIndex = 1             -- 子步骤
+    self.m_stepStartIndex = {}      -- 开始的第一步保存
+    self.m_subEndIndex = {}         -- 结束的第一步保存
+end
+
+function GuideData:InitMember()
+
+    if not self.m_timer then
+        self.m_timer = CountTimer.New()
+        self.m_timer:AddEventListener(CountTimer.EVENT_TIMER, self, function() self:TimerCheckJudge() end)
+    end    
+end
+
+-- 服务器记录值同步
+function GuideData:InitData()
+    
+    if not LuaGameVars.CanPlayGuide then
+        return
+    end
+
+    local temp = {}
+    for i, v in ipairs(DBData.guidBaseCfg) do
+        self.m_stepCfg[v.main_step] = self.m_stepCfg[v.main_step] or {}
+        self.m_stepCfg[v.main_step][v.index] = v
+
+        temp[v.main_step] = temp[v.main_step] or {}
+        table.insert(temp[v.main_step],v)
+    end
+
+    -- 大步骤的开始第一步
+    for main_step = 1, 1000 do
+        local cfg = temp[main_step]
+        if not cfg then
+            break
+        end
+        table.sort(cfg,function(a,b) return a.index &lt; b.index end)
+
+        local startInfo,endInfo = cfg[1],cfg[#cfg]
+        self.m_stepStartIndex[main_step] = startInfo.index
+        self.m_subEndIndex[main_step] = endInfo.index
+    end
+
+    -- 同步数据
+    local guide_index = GameData.playerData:GetValue(role_ids.guide_index)
+
+    self.m_stepIndex = (guide_index == 0) and 1 or guide_index
+    self.m_subIndex = self.m_stepStartIndex[self.m_stepIndex]
+    --self.m_subIndex = 0
+
+    --开始timer
+    if self.m_timer then
+        self.m_timer:start(-1, 0.2)
+    end    
+end
+
+-- 获取当前阶段的配置
+function GuideData:GetCurStepCfg()
+    
+    if not self.m_stepCfg[self.m_stepIndex] or not self.m_stepCfg[self.m_stepIndex][self.m_subIndex] then
+        return
+    end
+
+    return self.m_stepCfg[self.m_stepIndex][self.m_subIndex]
+end
+
+-- 间隔检测
+function GuideData:TimerCheckJudge()
+    
+    if MainView.ins:CheckUIIsShow(ModuleName.GuideModuleUI) then
+        return
+    end
+
+    if not self:CheckJudge() then
+        UIHelps.CloseWindow(ModuleName.GuideModuleUI)
+        return
+    end
+
+    UIHelps.OpenWindow(ModuleName.GuideModuleUI)
+end
+
+-- 增加步骤值
+function GuideData:AddStepIndex()
+
+    local curCfg = self:GetCurStepCfg()
+    if curCfg.end_step then
+        self.m_stepIndex = self.m_stepIndex + 1   
+    end
+    self.m_subIndex = curCfg.next_index
+
+
+    if self.m_stepIndex &gt; table.nums(self.m_stepCfg) then
+        -- 暂停计时器
+        if self.m_timer then
+            self.m_timer:stop()
+            self.m_timer:dispose()
+        end
+        self.m_timer = nil
+    end
+
+    -- 发给服务器记录
+    local info = {guide_index = self.m_stepIndex}
+    LuaAppFacade.getIns():SendNotification(NoticeConst.ROLE_SAVE_GUIDE_INDEX,info)
+end
+
+-- 检查条件
+function GuideData:CheckJudge()
+    
+    if not self.m_stepCfg[self.m_stepIndex] or not self.m_stepCfg[self.m_stepIndex][self.m_subIndex] then
+        return
+    end
+
+    local cfg = self.m_stepCfg[self.m_stepIndex][self.m_subIndex]
+    if not cfg or cfg.main_step ~= self.m_stepIndex then
+        return
+    end
+
+    -- 检测初始位置是主界面 还是挂机的指引
+    if cfg.index == self.m_stepStartIndex[cfg.main_step] then
+        local nextInfo = DBData.guidBaseCfg[cfg.next_index]
+        if nextInfo.ModuleName == &quot;BattleHomeModuleUI&quot; then
+            if MainView.ins:CheckUIIsShow(nextInfo.ModuleName) then
+                self:AddStepIndex()
+                return
+            end    
+        end    
+    end
+    -- 检查UI是否打开 要放在后面
+    local ModuleName = cfg.ModuleName
+    if not MainView.ins:CheckUIIsShow(ModuleName) then
+        return
+    end
+
+    -- 指引检查
+    if self.m_stepIndex == 1 then
+        -- 剧情体验战斗
+    elseif self.m_stepIndex == 2 then
+        -- 主线战斗1
+        return self:CheckBaseJudge1(1)
+    elseif self.m_stepIndex == 3 then
+        -- 卡牌升级和穿戴装备
+        return self:CheckBaseJudge2()
+    elseif self.m_stepIndex == 4 then
+        -- 补给抽奖
+        return self:CheckBaseJudge3()
+    elseif self.m_stepIndex == 5 then
+        -- 主线战斗2
+        return self:CheckBaseJudge1(2)
+    end
+
+    -- 没有大步骤检测只有子步骤
+    if cfg.other_fun_index then
+        return self:CheckOtherFunIndex()
+    end
+
+    return true
+end
+
+-- 主线战斗1 2
+function GuideData:CheckBaseJudge1(needSection)
+
+    local cfg = self:GetCurStepCfg()
+    -- 检测主线战斗1
+    if cfg.index == self.m_stepStartIndex[cfg.main_step] then
+	
+        if curCfg.chapter &gt; 0 and curCfg.section &gt;= needSection then
+            self.m_stepIndex = cfg.main_step + 1
+            self.m_subIndex = self.m_stepStartIndex[self.m_stepIndex]
+            return
+        end
+    end
+
+    return self:CheckOtherFunIndex()
+end
+
+-- 卡牌升级
+function GuideData:CheckBaseJudge2()
+
+    -- 检测卡牌升级和穿戴装备
+    local cfg = self:GetCurStepCfg()
+    if cfg.index == self.m_stepStartIndex[cfg.main_step] then
+        local items = GameData.bagData:GetContainerItems(global.system_cfg.bag_type.card_bag)
+        for _, item in pairs(items) do
+            local equips = item:Get_Equips()
+            if item:Level() &gt; 1 and table.nums(equips) &gt; 1 then
+                self.m_stepIndex = cfg.main_step + 1
+                self.m_subIndex = self.m_stepStartIndex[self.m_stepIndex]
+                return
+            end    
+        end
+    end    
+
+    return self:CheckOtherFunIndex()
+end
+
+-- 补给抽奖
+function GuideData:CheckBaseJudge3()
+
+    local cfg = self:GetCurStepCfg()
+    if cfg.index == self.m_stepStartIndex[cfg.main_step] then
+
+        if not isFree then
+            self.m_stepIndex = cfg.main_step + 1
+            self.m_subIndex = self.m_stepStartIndex[self.m_stepIndex]
+            return
+        end
+    end    
+
+    return self:CheckOtherFunIndex()
+end
+--------------------------------------------------------------------- 淫荡分更新 ------------------------------------------------------
+-- 检测子步骤
+function GuideData:CheckOtherFunIndex()
+
+    local cfg = self:GetCurStepCfg()
+    if cfg.other_fun_index == 1 then
+        -- 检测卡牌有没有升级
+        return self:CheckCardUpLevel()
+    elseif cfg.other_fun_index == 2 then
+        -- 检测主线有没有出战上阵
+        return self:CheckEmBattleSlot()
+    elseif cfg.other_fun_index == 3 then
+        -- 检测个人演习有没有出战上阵
+        return self:CheckEmBattleExercise()
+    elseif cfg.other_fun_index == 4 then
+        -- 检测剧情演示副本角色能量是否已满
+        return self:CheckStoryStageEnergy()
+    end
+
+    return true
+end
+
+--检测卡牌升级
+function GuideData:CheckCardUpLevel()
+
+end
+
+-- 检测主线有没有出战上阵
+function GuideData:CheckEmBattleSlot()
+
+end
+
+-- 检测个人演习有没有出战上阵
+function GuideData:CheckEmBattleExercise()
+
+end
+
+-- 检测剧情演示副本角色能量是否已满
+function GuideData:CheckStoryStageEnergy()
+
+end
+--------------------------------------------------------------------- 淫荡分更新 ------------------------------------------------------
+
+</code></pre>
+<p>表现层<br>
+GuideModuleUI.lua</p>
+<pre><code class="language-lua">module ('m__' .. ..., package.seeall)
+
+local GuideModuleUI = newClass(&quot;GuideModuleUI&quot;, LuaWindowModule)
+function GuideModuleUI:ModuleAwake( ... )
+
+    self:SuperCall(GuideModuleUI, &quot;ModuleAwake&quot;);
+
+    self:ConstructMember()
+	self:InitMember()
+end
+
+-- 声明变量
+function GuideModuleUI:ConstructMember()
+
+	UIStorage.FillTableAttr(self)
+
+	self.m_dicNoticeHandle = {}	    -- 辅助监听回调
+    self.m_OnClickBtn = nil
+    self.m_OnClickEvent = nil
+    self.m_timer = nil
+    self.m_timerDelay = nil
+    self.m_countDownTime = 50       -- 倒计时时间
+    self.m_cfg = {}                 -- 配置表
+    self.m_curMeshColliderPos = nil -- 保存的设置位置  
+end 
+
+-- 初始化成员
+function GuideModuleUI:InitMember()
+
+    LuaUIEventListener.AddEvent_OnClick(self.meshCollider.gameObject, function() self:OnClick() end)
+
+    if not self.m_timer then
+        self.m_timer = CountTimer.New()
+        self.m_timer:AddEventListener(CountTimer.EVENT_TIMER, self, function() self:UpdateTimer() end)
+        self.m_timer:start(-1, 1)
+    end
+end
+
+-- 打开
+function GuideModuleUI:Show(body)
+
+    self.m_cfg = GameData.guideData:GetCurStepCfg()
+    self.meshCollider.gameObject:SetActive(true)
+    -- 显示
+    self:UpdateGuidUI()
+end
+
+-- 关闭
+function GuideModuleUI:Close()
+
+    if self.m_timer then
+        self.m_timer:dispose()
+        self.m_timer = nil
+    end
+
+    if self.m_timerDelay then
+        self.m_timerDelay:dispose()
+        self.m_timerDelay = nil
+    end
+end
+
+-- 释放委托
+function GuideModuleUI:ReleaseEvent()
+
+    if self.m_OnClickBtn and self.m_OnClickEvent then
+        LuaUIEventListener.ReleaseEvent_OnClick(self.m_OnClickBtn,self.m_OnClickEvent)
+    end
+    self.m_OnClickBtn = nil
+    self.m_OnClickEvent = nil
+end
+
+-- 获取对应界面按钮
+function GuideModuleUI:GetButton()
+
+    if self.m_cfg.isSceneNode and GameObject.Find(self.m_cfg.targe_node) then
+        return GameObject.Find(self.m_cfg.targe_node)
+    end
+
+    local ViewContainerType = {&quot;UIPopupView&quot;,&quot;UIBaseView&quot;,&quot;UITopView&quot;}
+    for k, type in pairs(ViewContainerType) do
+        local objParentObj = MainView.ins:GetViewContainer(type)
+        local buttonTrans = objParentObj.transform:Find(self.m_cfg.targe_node)
+        if buttonTrans and buttonTrans.gameObject and buttonTrans.gameObject.activeInHierarchy then
+            return buttonTrans.gameObject
+        end    
+    end
+
+    return printError(&quot;填写的节点位置不对请仔细检查：&quot; .. self.m_cfg.targe_node)
+end
+
+-- 获取对应的位置
+function GuideModuleUI:GetTargetPos()
+    
+    if not self.m_OnClickBtn then return end
+
+    if self.m_cfg.isSceneNode then
+        -- 场景按钮
+        local scenePos = self.m_OnClickBtn.transform.position
+        local x,y,z = UIHelps.ChangeScenePosToUIPos(scenePos.x,scenePos.y, scenePos.z)
+        local guideLocalPos = self.bg.transform.parent:InverseTransformPoint(Vector3.New(x, y, 1))
+        guideLocalPos.x = guideLocalPos.x
+        guideLocalPos.y = guideLocalPos.y
+        return guideLocalPos
+    else
+        local widget = self.m_OnClickBtn:GetComponent(&quot;UIWidget&quot;)
+        local labPivotX = widget.pivotOffset.x --0.5
+        local labPivotY = widget.pivotOffset.y --0.5
+
+        local guideLocalPos = self.bg.transform.parent:InverseTransformPoint(self.m_OnClickBtn.transform.position)
+        guideLocalPos.x = guideLocalPos.x + (0.5 - labPivotX) * widget.width + (self.m_cfg.offsetX or 0)
+        guideLocalPos.y = guideLocalPos.y + (0.5 - labPivotY) * widget.height + (self.m_cfg.offsetY or 0)
+
+        return guideLocalPos
+    end    
+end
+
+-- 更新位置
+function GuideModuleUI:UpdateMeshCollider()
+
+    if not self.m_OnClickBtn then return end
+
+    local guideLocalPos = self:GetTargetPos()
+    self.meshCollider.transform.localPosition = guideLocalPos
+    self.m_curMeshColliderPos = guideLocalPos
+    self.meshCollider.width = self.m_cfg.radius * 2
+    self.meshCollider.height = self.m_cfg.radius * 2
+
+    -- 显示圆形裁剪坐标
+    local sp = self.bg:GetComponent(&quot;UISprite&quot;)
+    local m_Material = Material.New(Shader.Find(&quot;UI/CircleGuide&quot;))
+    m_Material:SetVector(&quot;_Center&quot;,Vector4.New(guideLocalPos.x, guideLocalPos.y, 0, 0))
+    m_Material:SetFloat(&quot;_Slider&quot;,self.m_cfg.radius)
+    sp.material = m_Material
+
+    -- 圆形特效
+    self.arrowEffect.transform.localPosition = guideLocalPos
+    self.arrowEffect:SetActive(true)
+end
+
+-- 更新对话框
+function GuideModuleUI:UpdateDialogue()
+
+    if not self.m_cfg or not self.m_cfg.dialog_direction then
+        return
+    end
+
+    self.dialogueLeftNode:SetActive(self.m_cfg.dialog_direction == 1)
+    self.dialogueRightNode:SetActive(self.m_cfg.dialog_direction == 2)
+    if self.m_cfg.dialog_direction == 1 then
+
+        self.text_left_jueseming.text = self.m_cfg.name
+        self.text_left_wenbenneirong.text = self.m_cfg.dialog_dec
+
+        local to = self.dialogueLeftNode.transform.localPosition
+        local from = {x = to.x - 1500, y = to.y, z = to.z}
+        self.dialogueLeftNode.transform.localPosition = from
+        self.dialogueLeftNode.transform:DOLocalMoveX(to.x, 0.5):OnComplete(function()
+            self.act_left_wenbenneirong:SetCharsPerSecond(12)
+            self.act_left_wenbenneirong:ResetToBeginning()
+        end)
+    else
+        self.text_right_jueseming.text = self.m_cfg.name
+        self.text_right_wenbenneirong.text = self.m_cfg.dialog_dec
+
+        local to = self.dialogueRightNode.transform.localPosition
+        local from = {x = to.x + 1500, y = to.y, z = to.z}
+        self.dialogueRightNode.transform.localPosition = from
+        self.dialogueRightNode.transform:DOLocalMoveX(to.x, 0.5):OnComplete(function()
+
+            self.act_right_wenbenneirong:SetCharsPerSecond(12)
+            self.act_right_wenbenneirong:ResetToBeginning()
+        end)
+    end
+end
+
+-- 检测位置坐标 防止位置错误
+function GuideModuleUI:CheckTargePos()
+    
+    local guideLocalPos = self:GetTargetPos()
+    if self.m_curMeshColliderPos and self.m_curMeshColliderPos ~= guideLocalPos then
+        self:UpdateMeshCollider()
+    end     
+end
+
+-- 刷新这个界面
+function GuideModuleUI:UpdateGuidUI()
+
+    -- 释放
+    self:ReleaseEvent()
+
+    self.m_OnClickBtn = self:GetButton()
+    if not self.m_OnClickBtn then
+        UIHelps.CloseWindow(ModuleName.GuideModuleUI)
+        return
+    end
+
+    -- 按钮增加委托
+    if not self.m_cfg.isSceneNode then
+        self.m_OnClickEvent = LuaUIEventListener.AddEvent_OnClick2(self.m_OnClickBtn, function() self:ShowNext() end)  
+    else
+        -- 场景按钮直接增加
+        GameData.guideData:AddStepIndex()
+    end 
+
+    -- 更新对话
+    self:UpdateDialogue()
+
+    -- 更新手指位置
+    if self.m_cfg.delay_time then
+        -- 延迟显示手指
+        self.m_timerDelay = CountTimer.New()
+        self.m_timerDelay:AddEventListener(CountTimer.EVENT_TIMERCOMPLETE, self, function()
+            self:UpdateMeshCollider()
+        end)
+        self.m_timerDelay:start(1, self.m_cfg.delay_time)
+    else
+        self:UpdateMeshCollider()
+        -- 检测手指最终位置对不对
+        self.m_timerDelay = CountTimer.New()
+        self.m_timerDelay:AddEventListener(CountTimer.EVENT_TIMERCOMPLETE, self, function()
+            self:CheckTargePos()
+        end)
+        self.m_timerDelay:start(1,3)
+    end
+end
+
+-- 显示下一个
+function GuideModuleUI:ShowNext()
+
+    -- 释放
+    self:ReleaseEvent()
+    -- 下一个步骤
+    GameData.guideData:AddStepIndex()
+    -- 走重新打开界面
+    UIHelps.CloseWindow(ModuleName.GuideModuleUI)
+end
+
+function GuideModuleUI:UpdateTimer()
+
+    if self.m_countDownTime then
+        self.m_countDownTime = self.m_countDownTime - 1
+        if self.m_countDownTime &lt; 0 then
+            self.m_timer:stop()
+            self:ShowNext()
+        end
+    end
+end
+
+-- 点击关闭
+function GuideModuleUI:OnClickClose()
+
+	UIHelps.CloseWindow(ModuleName.GuideModuleUI)
+end
+
+-- 点击背景
+function GuideModuleUI:OnClick()
+
+end
+
+-- 注册监听
+function GuideModuleUI:listNotificationInterests()
+    return {
+
+    }
+end
+
+-- 监听回调
+function GuideModuleUI:handleNotification(notification )
+
+    local msgName = notification:getName()
+    local body = notification:getBody()
+
+    local handle = self.m_dicNoticeHandle[msgName]
+    if handle ~= nil then
+        handle(self, body)
+    end
+end
+
+</code></pre>
+<p>看我们的配置表<br>
+<img src="https://img.anqiqi.cn/file/184844f780dc18c0ffa5c.png" alt="" loading="lazy"></p>
+<p>大功告成<br>
+。。。<br>
+。。<br>
+。</p>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/UnityIOS打包/">
+                <h3 class="post-title">
+                  UnityIOS打包
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge secondary">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge secondary">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge warning">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge success">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge success">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge ">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge success">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge secondary">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge secondary">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge secondary">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge secondary">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge ">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge ">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>

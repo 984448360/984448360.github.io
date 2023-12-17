@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>U3D 基于NGUI写的 自适应大小的ListView | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>U3D 基于NGUI写的 自适应大小的ListView</h1>
+            <p class="article-meta">
+              2021-10-20
+              
+                <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge secondary">
+                  轮子
+                </a>
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <pre><code class="language-c#">
+
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+using System;
+
+public enum Layout
+{
+    Vertical,
+    Horizontal
+}
+
+/// &lt;summary&gt;
+///	无限Item列表
+/// &lt;/summary&gt;
+public class UIDiffSizeListView : MonoBehaviour
+{
+
+    public Layout 				layout;
+    public Vector2				spacing;
+    public GameObject           itemPrefab;
+    private UIItemRender        itemRender = null;
+    private UIPanel             mPanel;
+    public UIScrollView 		mScrollView;
+    private bool				initialized = false;
+    private GameObject		    content;
+    private Vector2			    scrollRectSize;
+    private GameObject          pressObj;
+    private bool isDraging      = false;
+    private bool isInvalid;
+    public List&lt;object&gt; dataList = new List&lt;object&gt;();
+    private Dictionary&lt;int, UIItemRender&gt; dirCurItems = new Dictionary&lt;int, UIItemRender&gt;();
+    private Dictionary&lt;int, UIItemRender&gt; tmpDic2 = new Dictionary&lt;int, UIItemRender&gt;();
+    private Dictionary&lt;int, Vector2&gt; itemSizes = new Dictionary&lt;int, Vector2&gt;();
+    private Queue&lt;UIItemRender&gt; unUseItems = new Queue&lt;UIItemRender&gt;();
+
+    void Awake()
+    {
+        this.Init();
+    }
+
+    public void AddData(object obj)
+    {
+        this.dataList.Add(obj);
+        this.Invalidate();
+    }
+    
+    public void UpdateDataAt(object obj, int inx)
+    {
+        if (inx &gt;= 0 &amp;&amp; inx &lt;= this.dataList.Count)
+        {
+            this.dataList[inx] = obj;
+            this.itemSizes.Remove(inx);
+            this.Invalidate();
+        }
+    }
+
+    public void InsertData(object obj, int inx)
+    {
+        this.dataList.Insert(inx, obj);
+
+        Dictionary&lt;int, Vector2&gt; tmpDic = new Dictionary&lt;int, Vector2&gt;();
+        for(int i = 0; i &lt; this.dataList.Count; ++i)
+        {
+            if (i &lt; inx)
+            {   
+                if(this.itemSizes.ContainsKey(i))
+                {
+                    tmpDic[i] = this.itemSizes[i];
+                }
+            }
+            else if (i &gt; inx)
+            {
+                if(this.itemSizes.ContainsKey(i - 1))
+                {
+                    tmpDic[i] = this.itemSizes[i - 1];
+                }
+            }
+        }
+        this.itemSizes = null;
+        this.itemSizes = tmpDic;
+
+        this.Invalidate();
+    }
+
+    public void RemoveDataAt(int inx)
+    {
+        if (inx &gt;= 0 &amp;&amp; inx &lt;= this.dataList.Count)
+        {
+            this.dataList.RemoveAt(inx);
+
+            Dictionary&lt;int, Vector2&gt; tmpDic = new Dictionary&lt;int, Vector2&gt;();
+            for(int i = 0; i &lt; this.dataList.Count; ++i)
+            {
+                if (i &lt; inx)
+                {   
+                    if(this.itemSizes.ContainsKey(i))
+                    {
+                        tmpDic[i] = this.itemSizes[i];
+                    }
+                }
+                else if (i &gt; inx)
+                {
+                    if(this.itemSizes.ContainsKey(i + 1))
+                    {
+                        tmpDic[i] = this.itemSizes[i + 1];
+                    }
+                }
+            }
+            this.itemSizes = null;
+            this.itemSizes = tmpDic;
+            this.Invalidate();
+        }
+    }
+
+    public void JumpTo(int inx)
+    {   
+        if (inx &gt;= 0 &amp;&amp; inx &lt;= this.dataList.Count)
+        {
+            float sizeSum = 0;
+            UIWidget widget = this.content.GetComponent&lt;UIWidget&gt;();
+            if (this.layout == Layout.Vertical)
+            {
+                for(int i = 0; i &lt; inx; ++i)
+                {   
+                    Vector2 size = this.GetSizeByInx(i);
+                    sizeSum = sizeSum + size.y;
+                }
+                this.mScrollView.MoveRelative(new Vector3(0,sizeSum,0));
+            }
+            else if (this.layout == Layout.Horizontal)
+            {
+                for(int i = 0; i &lt; inx; ++i)
+                {   
+                    Vector2 size = this.GetSizeByInx(i);
+                    sizeSum = sizeSum + size.x;
+                }
+                this.mScrollView.MoveRelative(new Vector3(sizeSum,0,0));
+            }
+        }    
+    }
+    
+    public void JumpToBottom()
+    {   
+        UIWidget widget = this.content.GetComponent&lt;UIWidget&gt;();
+        if (this.layout == Layout.Vertical)
+        {
+            this.mScrollView.ResetPosition();
+            float showPos = widget.height - scrollRectSize.y;
+            if (showPos &gt; 0)
+                this.mScrollView.MoveRelative(new Vector3(0,showPos,0));
+            
+        }
+        else if (this.layout == Layout.Horizontal)
+        {   
+            this.mScrollView.ResetPosition();
+            float showPos = widget.width - scrollRectSize.x;
+            if (showPos &gt; 0)
+                this.mScrollView.MoveRelative(new Vector3(showPos,0,0));
+        }   
+    }
+    public void JumpToTop()
+    {   
+        UIWidget widget = this.content.GetComponent&lt;UIWidget&gt;();
+        if (this.layout == Layout.Vertical)
+        {
+            this.mScrollView.SetDragAmount(0,0,false);
+        }
+        else if (this.layout == Layout.Horizontal)
+        {
+            this.mScrollView.SetDragAmount(0,0,false);
+        }   
+    }
+
+    public void Init()
+    {   
+
+        if (initialized)
+            return;
+        initialized = true;
+
+        mPanel = NGUITools.FindInParents&lt;UIPanel&gt;(gameObject);
+        this.mScrollView = mPanel.GetComponent&lt;UIScrollView&gt;();
+        this.mPanel.onClipMove += OnUIPanelClipMove;
+
+        // record some sizes
+        scrollRectSize = mPanel.GetViewSize();
+
+        // add a scrollrect content
+        GameObject go = new GameObject ();
+		go.name = &quot;content&quot;;
+        go.transform.SetParent(transform);
+        
+        UIWidget uiwidget = go.AddComponent&lt;UIWidget&gt;();
+        uiwidget.pivot = UIWidget.Pivot.TopLeft;
+        uiwidget.SetDimensions((int)scrollRectSize.x,(int)scrollRectSize.y);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localScale = Vector3.one;
+        this.content = go;
+
+        //itemPrefab
+        GameObject item = GameObject.Instantiate(itemPrefab) as GameObject;
+        item.transform.SetParent(mPanel.transform.parent);
+        item.transform.localPosition = new Vector3(1500, 1500, 1);
+        itemRender = item.GetComponent&lt;UIItemRender&gt;();
+        if (itemRender == null)
+            itemRender = item.AddComponent&lt;UIItemRender&gt;();
+
+        this.mScrollView.onDragStarted += delegate ()
+        {
+            this.isDraging = true;
+        };
+        this.mScrollView.onDragFinished += delegate ()
+        {
+            this.isDraging = false;
+            this.pressObj = null;
+        };
+    }
+
+    // 全部清除重新计算每个的大小
+    public void ClearAll()
+    {
+        this.dataList.Clear();
+        this.itemSizes.Clear();
+        this.Invalidate();
+    }
+
+    public void ClearAllCurItems()
+    {
+        var enumerator = this.dirCurItems.GetEnumerator();
+        while (enumerator.MoveNext())
+        {   
+            Destroy(enumerator.Current.Value.gameObject);
+        }
+        this.dirCurItems.Clear();
+    }
+
+    void LateUpdate()
+    {
+        UpdateNow();
+    }
+
+    public void UpdateNow()
+    {
+        if (this.isInvalid)
+        {
+            if (!this.gameObject.activeInHierarchy)
+                return;
+
+            this.ClearAllCurItems();
+            this.UpdateView();
+            this.UpdateScrollView();
+            this.isInvalid = false;
+        }
+    }
+    
+    private void Invalidate()
+    {
+        this.isInvalid = true;
+    }
+
+    private void OnUIPanelClipMove(UIPanel panel)
+    {
+        this.UpdateView();
+    }
+
+    private void UpdateScrollView()
+    {
+        this.mScrollView.InvalidateBounds();
+        this.mScrollView.RestrictWithinBounds(true);
+        this.mScrollView.UpdateScrollbars(false);
+    }
+
+    private Vector2 GetSizeByInx(int inx)
+    {
+        if(!this.itemSizes.ContainsKey(inx))
+        {
+            
+            itemRender.SetData(this.dataList[inx]);
+            UIWidget widget = itemRender.GetComponent&lt;UIWidget&gt;();
+
+            Vector2 size = Vector2.zero;
+            size.x = widget.width;
+            size.y = widget.height;
+
+            this.itemSizes.Add(inx, size);
+        }
+
+        return this.itemSizes[inx];
+    }
+
+    private Vector3 GetLocalPosByInx(int inx)
+    {
+        Vector3 pos = Vector3.zero;
+        for(int i = 0; i &lt; inx; ++i)
+        {   
+            Vector2 size = this.GetSizeByInx(i);
+            if (this.layout == Layout.Vertical)
+            {
+                pos.y = pos.y - size.y;
+            }
+            else if (this.layout == Layout.Horizontal)
+            {
+                pos.x = pos.x + size.x;
+            }
+        }
+
+        return pos;
+    }
+
+    private Vector2Int GetStartInxAndEndInx(float min,float max)
+    {   
+        int startInx = -1;
+        int endInx = -1;
+        float AreaCellSizeCount = 0;
+        for(int i = 0; i &lt; this.dataList.Count; ++i)
+        {   
+            Vector2 size = this.GetSizeByInx(i);
+            if (this.layout == Layout.Vertical)
+            {   
+                if (max &gt; 0) 
+                {
+                    startInx = 0;
+                }
+                UIWidget widget = this.content.GetComponent&lt;UIWidget&gt;();
+                if (Math.Abs(min) &gt; widget.height) 
+                {
+                    endInx = this.dataList.Count - 1;
+                }
+
+
+                AreaCellSizeCount = AreaCellSizeCount + size.y;
+                if (AreaCellSizeCount &gt; Math.Abs(max) &amp;&amp; startInx == -1)
+                {
+                    startInx = i;
+                }
+                
+                if (AreaCellSizeCount &gt; Math.Abs(min) &amp;&amp; endInx == -1)
+                {
+                    endInx = i;
+                }
+            }
+            else if (this.layout == Layout.Horizontal)
+            {
+                
+                AreaCellSizeCount = AreaCellSizeCount + size.x;
+
+                if (AreaCellSizeCount &gt; Math.Abs(max) &amp;&amp; startInx == -1)
+                {
+                    startInx = i;
+                }
+
+                if (AreaCellSizeCount &gt; Math.Abs(min) &amp;&amp; endInx == -1)
+                {
+                    endInx = i;
+                }
+            }
+
+            if (startInx != -1 &amp;&amp; endInx != -1)
+                break;
+        }
+
+        return new Vector2Int(startInx,endInx);
+    }
+
+    private UIItemRender CreateItemRender()
+    {
+        UIItemRender item = null;
+        if (unUseItems.Count &gt; 0)
+        {
+            item = unUseItems.Dequeue();
+            item.gameObject.SetActive(true);
+            return item;
+        }
+        GameObject obj = NGUITools.AddChild(content, itemPrefab);
+        item = obj.GetComponent&lt;UIItemRender&gt;();
+        if (item == null)
+            item = obj.AddComponent&lt;UIItemRender&gt;();
+        if (obj.GetComponent&lt;UIDragScrollView&gt;() != null)
+            UIEventListener.Get(obj).onPress += OnPressItem;
+
+        obj.SetActive(true);
+        
+        return item;
+    }
+
+    private void OnPressItem(GameObject obj, bool isPress)
+    {
+        if (isPress)
+        {
+            pressObj = obj;
+        }
+        else
+        {
+            if (obj == pressObj)
+                pressObj = null;
+        }
+    }
+
+    private bool RecoverItemRender(UIItemRender item)
+    {
+        bool result = false;
+        if (item.gameObject == pressObj &amp;&amp; isDraging)
+        {
+
+            pressObj = null;
+            result = true;
+        }
+
+        unUseItems.Enqueue(item);
+        item.SetSelected(false);
+        item.gameObject.SetActive(false);
+        return result;
+    }
+    
+    private void UpdateSize()
+    {   
+        Vector2 tempSize = Vector2.zero;
+        for(int i = 0; i &lt; this.dataList.Count; ++i)
+        {   
+            Vector2 size = this.GetSizeByInx(i);
+            if (this.layout == Layout.Vertical)
+            {
+                tempSize.x = size.x;
+                tempSize.y = tempSize.y + size.y;
+            }
+            else if (this.layout == Layout.Horizontal)
+            {
+                tempSize.x = tempSize.x + size.x;
+                tempSize.y = size.y;
+            }
+        }
+
+        UIWidget widget = this.content.GetComponent&lt;UIWidget&gt;();
+        widget.SetDimensions(Mathf.FloorToInt(tempSize.x), Mathf.FloorToInt(tempSize.y));
+    }
+
+    private void UpdateView()
+    {   
+        this.Init();
+        this.UpdateSize();
+
+        Vector3[] corners = mPanel.worldCorners;
+        for (int i = 0; i &lt; 4; ++i)
+        {
+            Vector3 v = corners[i];
+            v = this.content.transform.InverseTransformPoint(v);
+            corners[i] = v;
+        }
+
+        float min = 0;
+        float max = 0;
+        int tmpSizeH = 100;
+        int tmpSizeW = 100;
+        int maxInx = 0;
+        int startInx = 0;
+        int endInx = 0;
+
+        if (this.layout == Layout.Vertical)
+        {
+            min = corners[0].y;
+            max = corners[2].y;
+            max += tmpSizeH;
+            min -= tmpSizeH;
+            min = Mathf.Min(0, min);
+            max = Mathf.Min(0, max);
+            maxInx = Mathf.Max(0, this.dataList.Count - 1);
+            tmpSizeW = 0;
+
+            Vector2Int tempInx = this.GetStartInxAndEndInx(min,max);
+            startInx = tempInx.x;
+            endInx = tempInx.y;
+            startInx = Mathf.Min(startInx, maxInx);
+            endInx = Mathf.Min(endInx, maxInx);
+        }
+        else if (this.layout == Layout.Horizontal)
+        {
+            min = corners[0].x;
+            max = corners[2].x;
+            max += tmpSizeW;
+            min -= tmpSizeW;
+            min = Mathf.Max(0, min);
+            max = Mathf.Max(0, max);
+            maxInx = Mathf.Max(0, this.dataList.Count - 1);
+            tmpSizeH = 0;
+
+            Vector2Int tempInx = this.GetStartInxAndEndInx(min,max);
+            startInx = tempInx.x;
+            endInx = tempInx.y;
+            startInx = Mathf.Min(startInx, maxInx);
+            endInx = Mathf.Min(endInx, maxInx);
+        }
+        
+        int count = this.dataList.Count;
+        Dictionary&lt;int, UIItemRender&gt;.Enumerator enumerator = this.dirCurItems.GetEnumerator();
+        bool recoverFocus = false;
+        while (enumerator.MoveNext())
+        {
+
+            int key = enumerator.Current.Key;
+            if (count &gt; 0 &amp;&amp; key &gt;= startInx &amp;&amp; key &lt;= endInx)
+            {
+                this.tmpDic2[key] = enumerator.Current.Value;
+            }
+            else
+            {
+                bool tmp = this.RecoverItemRender(enumerator.Current.Value);
+                if (tmp)
+                    recoverFocus = true;
+            }
+        }
+        
+        this.dirCurItems.Clear();
+        Dictionary&lt;int, UIItemRender&gt; tmpDic = null;
+        tmpDic = dirCurItems;
+        dirCurItems = tmpDic2;
+        tmpDic2 = tmpDic;
+
+        if (count &gt; 0 &amp;&amp; startInx &gt;= 0)
+        {
+            
+            for (int i = startInx; i &lt;= endInx; i++)
+            {
+                UIItemRender item = null;
+                Vector3 position = this.GetLocalPosByInx(i);
+                if (!this.dirCurItems.TryGetValue(i, out item))
+                {
+                    item = this.CreateItemRender();
+                    item.__index = i;
+                    this.dirCurItems[i] = item;
+                    item.SetData(this.dataList[i]);
+                }
+                item.gameObject.name = i.ToString();
+                item.transform.localPosition = position;
+            }
+        }
+        if (recoverFocus)
+            this.mScrollView.Press(false);
+    }
+}
+
+</code></pre>
+<p>第二版</p>
+<pre><code class="language-c#">
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+using System;
+using LuaInterface;
+
+// public enum Layout
+// {
+//     Vertical,
+//     Horizontal
+// }
+
+/// &lt;summary&gt;
+///	无限Item列表
+/// &lt;/summary&gt;
+public class UIDictListView : MonoBehaviour
+{
+
+    public  Layout 				layout;
+    public  Vector2				spacing;
+    public  GameObject          itemPrefab;
+    private Vector3				panelDefaultPos;
+    private Vector2             panelDefaultClipOffset;
+    private UIPanel             mPanel;
+    public  UIScrollView 		mScrollView;
+    private UIItemRender        itemRender = null;
+    private bool				initialized = false;
+    private GameObject		    content;
+    private Vector2			    scrollRectSize;
+    public  bool                bBackLoad = false;
+    public  bool                isCheackBackLoad = false;      
+    public  List&lt;object&gt;        dataList = new List&lt;object&gt;();
+    private List&lt;UIItemRender&gt;	lstItems = new List&lt;UIItemRender&gt;();
+    private GameObject          pressObj;
+    private bool isDraging      = false;
+    float svLastPos = 0;        //记录scrollviet上一次的位置，用于判断scrollview的移动方向
+
+    void Awake()
+    {
+        this.Init();
+    }
+
+    public void Init()
+    {   
+
+        if (initialized)
+            return;
+        initialized = true;
+
+        mPanel = NGUITools.FindInParents&lt;UIPanel&gt;(gameObject);
+        this.mScrollView = mPanel.GetComponent&lt;UIScrollView&gt;();
+        this.mPanel.onClipMove += OnUIPanelClipMove;
+        this.panelDefaultPos = mPanel.transform.localPosition;
+        this.panelDefaultClipOffset = mPanel.clipOffset;
+
+        // record some sizes
+        scrollRectSize = mPanel.GetViewSize();
+
+        // add a scrollrect content
+        GameObject go = new GameObject ();
+		go.name = &quot;content&quot;;
+        go.transform.SetParent(transform);
+        
+        UIWidget uiwidget = go.AddComponent&lt;UIWidget&gt;();
+        uiwidget.SetDimensions((int)scrollRectSize.x,(int)scrollRectSize.y);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localScale = Vector3.one;
+        this.content = go;
+
+        //itemPrefab
+        GameObject item = GameObject.Instantiate(itemPrefab) as GameObject;
+        item.transform.SetParent(mPanel.transform.parent);
+        item.transform.localPosition = new Vector3(1500, 1500, 1);
+        itemRender = item.GetComponent&lt;UIItemRender&gt;();
+        if (itemRender == null)
+            itemRender = item.AddComponent&lt;UIItemRender&gt;();
+
+        this.mScrollView.onDragStarted += delegate ()
+        {
+            this.isDraging = true;
+        };
+        this.mScrollView.onDragFinished += delegate ()
+        {
+            this.isDraging = false;
+            this.pressObj = null;
+        };
+    }
+
+    public void AddData(object obj)
+    {
+        this.dataList.Add(obj);
+    }
+
+    public void InsertData(object data,int inx)
+    {
+        this.dataList.Insert(inx, data);
+    }
+
+    public void ClearAll()
+    {
+        this.dataList.Clear();
+    }
+
+    public void UpdateNow()
+    {
+        this.Init();
+        this.AutoContentPivot();
+        this.UpdateView();
+    }
+
+    private void ClearAllItems()
+    {
+        var enumerator = this.lstItems.GetEnumerator();
+        while (enumerator.MoveNext())
+        {   
+            Destroy(enumerator.Current.gameObject);
+        }
+        this.lstItems.Clear();
+    }
+
+    public bool CheckBackLoad(LuaTable table)
+    {   
+        List&lt;LuaTable&gt; tableList = LuaTools.GetLuaTableToList&lt;LuaTable&gt;(table);
+        float containerH = 0;
+        for(int i = 0; i &lt; tableList.Count; ++i)
+        {   
+            itemRender.SetData(tableList[i]);
+            UIWidget itemWidget = itemRender.GetComponent&lt;UIWidget&gt;();
+            containerH = containerH + itemWidget.height;
+            // 初始布局,最多保证可隐藏的区域大于显示区域就可以了
+            if (containerH &gt; (scrollRectSize.y))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void AutoContentPivot()
+    {   
+        this.ClearAllItems();
+        
+        // 设置锚点
+        UIWidget contentWidget = this.content.GetComponent&lt;UIWidget&gt;();
+        contentWidget.SetDimensions((int)scrollRectSize.x,(int)scrollRectSize.y);
+        if(bBackLoad)
+        {
+            mPanel.transform.localPosition = this.panelDefaultPos - new Vector3(0,scrollRectSize.y - 1, 0);
+            mPanel.clipOffset = this.panelDefaultClipOffset + new Vector2(0,scrollRectSize.y - 1);
+
+            this.mScrollView.contentPivot = UIWidget.Pivot.BottomLeft;
+            contentWidget.pivot = UIWidget.Pivot.BottomLeft;
+        }
+        else
+        {
+            mPanel.transform.localPosition = this.panelDefaultPos;
+            mPanel.clipOffset = this.panelDefaultClipOffset;
+
+            this.mScrollView.contentPivot = UIWidget.Pivot.TopLeft;
+            contentWidget.pivot = UIWidget.Pivot.TopLeft;
+        }
+        this.content.transform.localPosition = Vector3.zero;
+        this.content.transform.localScale = Vector3.one;
+    }
+
+    private void OnUIPanelClipMove(UIPanel panel)
+    {   
+        Vector3 delta = panelDefaultPos - panel.transform.localPosition;
+        float distance = delta.y;
+
+        float moveDis = this.mScrollView.transform.localPosition.y - svLastPos;
+        if (Mathf.Abs(moveDis) &gt; 0.05 &amp;&amp; lstItems.Count &gt; 0)
+        {
+            bool isup = moveDis &gt; 0;
+            if (isup)
+            {
+                if(bBackLoad)
+                {
+                    float height = lstItems[lstItems.Count - 1].GetComponent&lt;UIWidget&gt;().height;
+                    while (lstItems[lstItems.Count - 1].transform.localPosition.y - height &gt; distance &amp;&amp;
+                        lstItems[0].__index &gt; 0)
+                    {
+                        UIItemRender  itemRender = lstItems[lstItems.Count - 1];
+                        int idx = lstItems[0].__index - 1;
+                        itemRender.SetData(dataList[idx]);
+                        itemRender.__index = idx;
+                        itemRender.gameObject.name = idx.ToString();
+
+                        lstItems.Insert(0, itemRender);
+                        lstItems.RemoveAt(lstItems.Count - 1);
+
+                        UIItemRender  tempRender = lstItems[1];
+                        float _height = tempRender.GetComponent&lt;UIWidget&gt;().height;         //锚点左上角所以加itemRender height
+                        itemRender.transform.localPosition = tempRender.transform.localPosition - new Vector3(0, _height, 0);
+                    }
+                }
+                else
+                {
+                    float height = lstItems[0].GetComponent&lt;UIWidget&gt;().height;
+                    while (lstItems[0].transform.localPosition.y - height &gt; distance &amp;&amp;
+                       lstItems[lstItems.Count - 1].__index &lt; dataList.Count - 1)
+                    {
+                        UIItemRender  itemRender = lstItems[0];
+                        int idx = lstItems[lstItems.Count - 1].__index + 1;
+                        itemRender.SetData(dataList[idx]);
+                        itemRender.__index = idx;
+                        itemRender.gameObject.name = idx.ToString();
+
+                        lstItems.Add(itemRender);
+                        lstItems.RemoveAt(0);
+
+                        
+                        UIItemRender  tempRender = lstItems[lstItems.Count - 2];
+                        float _height = tempRender.GetComponent&lt;UIWidget&gt;().height;         //锚点左上角所以加tempRender height
+                        itemRender.transform.localPosition = tempRender.transform.localPosition - new Vector3(0, _height, 0);
+                    }
+                }
+            }
+            else
+            {
+                if(bBackLoad)
+                {
+                    float height = lstItems[0].GetComponent&lt;UIWidget&gt;().height;
+                    distance = distance - scrollRectSize.y;
+                    while (distance &gt; lstItems[0].transform.localPosition.y &amp;&amp;
+                       lstItems[lstItems.Count - 1].__index &lt; dataList.Count - 1)
+                    {
+                        UIItemRender  itemRender = lstItems[0];
+                        int idx = lstItems[lstItems.Count - 1].__index + 1;
+                        itemRender.SetData(dataList[idx]);
+                        itemRender.__index = idx;
+                        itemRender.gameObject.name = idx.ToString();
+
+                        lstItems.Add(itemRender);
+                        lstItems.RemoveAt(0);
+
+                        
+                        UIItemRender  tempRender = lstItems[lstItems.Count - 2];
+                        float _height = itemRender.GetComponent&lt;UIWidget&gt;().height;         //锚点左上角所以加tempRender height
+                        itemRender.transform.localPosition = tempRender.transform.localPosition + new Vector3(0, _height, 0);
+                    }
+                }
+                else
+                {
+                    float height = lstItems[lstItems.Count - 1].GetComponent&lt;UIWidget&gt;().height;
+                    float temp = Mathf.Abs(distance) + scrollRectSize.y;
+                    while (lstItems[lstItems.Count - 1].transform.localPosition.y &lt; - temp &amp;&amp;
+                        lstItems[0].__index &gt; 0)
+                    {
+
+                        UIItemRender  itemRender = lstItems[lstItems.Count - 1];
+                        int idx = lstItems[0].__index - 1;
+                        itemRender.SetData(dataList[idx]);
+                        itemRender.__index = idx;
+                        itemRender.gameObject.name = idx.ToString();
+
+                        lstItems.Insert(0, itemRender);
+                        lstItems.RemoveAt(lstItems.Count - 1);
+
+                        UIItemRender  tempRender = lstItems[1];
+                        float _height = itemRender.GetComponent&lt;UIWidget&gt;().height;         //锚点左上角所以加itemRender height
+                        itemRender.transform.localPosition = tempRender.transform.localPosition + new Vector3(0, _height, 0);
+                    }
+                }
+                
+            }
+            svLastPos = this.mScrollView.transform.localPosition.y;
+        }
+    }
+
+    private UIItemRender loadOneItem()
+    {   
+        GameObject item = GameObject.Instantiate(itemPrefab) as GameObject;
+        UIItemRender itemRender = item.GetComponent&lt;UIItemRender&gt;();
+        item.transform.SetParent(this.content.transform);
+        item.transform.localScale = Vector3.one;
+
+        lstItems.Add(itemRender);
+        return itemRender;
+    }
+
+    private void UpdateView()
+    {   
+        svLastPos = 0;
+        this.ClearAllItems();
+        float containerH = 0;
+
+        Vector3 itemPosition = Vector3.zero;
+        for(int i = 0; i &lt; dataList.Count; ++i)
+        {   
+            UIItemRender itemRender = this.loadOneItem();
+            itemRender.SetData(dataList[i]);
+            itemRender.__index = i;
+            itemRender.gameObject.name = i.ToString();
+
+            UIWidget widget = itemRender.GetComponent&lt;UIWidget&gt;();
+            if(bBackLoad)
+            {
+                containerH = containerH + widget.height;        // 锚点在左上所以位置不是从0开始
+                itemPosition.y = itemPosition.y + widget.height;
+                itemRender.transform.localPosition = new Vector3(0,itemPosition.y, 0);
+            }
+            else
+            {
+                itemRender.transform.localPosition = new Vector3(0,itemPosition.y, 0);
+                containerH = containerH + widget.height;
+                itemPosition.y = itemPosition.y - widget.height;
+            }
+            
+            // 初始布局,最多保证可隐藏的区域大于显示区域就可以了
+            if (containerH &gt; (scrollRectSize.y * 1.5f))
+            {
+                break;
+            }
+        }
+    }
+}
+
+</code></pre>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/hello-gridea/">
+                <h3 class="post-title">
+                  Hello Gridea
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge ">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge secondary">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge success">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge secondary">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge ">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge secondary">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge ">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge secondary">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge secondary">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge secondary">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge secondary">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge success">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge ">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>UnityAB资源加密 | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>UnityAB资源加密</h1>
+            <p class="article-meta">
+              2022-02-21
+              
+                <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge warning">
+                  记录
+                </a>
+              
+                <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge warning">
+                  加密
+                </a>
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge ">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <p>1 最近学习了下 AB资源加密下面出来记录下<br>
+随着Unity的普及，现在已经越来越多的项目使用AB包，但是大部分都是没有加密的。比如某IP侵权的app，可以通过或者Unity内置的AssetBundleBrower直接看到ab包的所有资源<br>
+更甚者可以通过AssetStudio直接看到ab包的所有资源，图片，音频，动画，文本，CG视频等等（蒙皮动画目前不行），并且导出。<br>
+如果会写点代码，还可以在unity中，直接实例化出来，然后另存为Prefab，这样虽然无法获得fbx（其实fbx开源，自己反推写入数据也可以导出fbx），但是我们可以获得完整的Prefab，<br>
+设置内含了蒙皮信息。这样可以轻松获得所有的数据，贴图，音频，视频，模型，材质，蒙皮，动画等等</p>
+<p>2 看了下AB资源的加密方式大概有几种<br>
+2.1 unity中国区提供的一种加密方式<br>
+2.2 对AB包的二进制文件进行加密操作<br>
+2.3 使用offest加密<br>
+还要其他的吧  暂时没了解</p>
+<p>3 我看来看下对AB包的二进制文件进行加密操作</p>
+<pre><code>3.1 加密就是用秘钥跟ab文件异或处理，解密的时候也是再做一次异或处理即可，只要不被别人拿到秘钥就问题不大。
+</code></pre>
+<pre><code class="language-c#">    public static void Encypt(ref byte[] targetData, byte m_key)
+    {
+        //加密，与key异或，解密的时候同样如此
+        int dataLength = targetData.Length;
+        for (int i = 0; i &lt; dataLength; ++i)
+        {
+            targetData[i] = (byte)(targetData[i] ^ m_key);
+        }
+    }
+
+</code></pre>
+<pre><code>3.2 用算法加密
+</code></pre>
+<pre><code class="language-c#">    [MenuItem(&quot;AssetBundle/AssetBundle_Window&quot;)]
+    public static void BuildAssetToWindow()
+    {
+        string outPath = Application.dataPath + &quot;/../BuildAssetBundle/Window/&quot;;
+        CreateDir(outPath);
+        BuildPipeline.BuildAssetBundles(outPath,BuildAssetBundleOptions.ForceRebuildAssetBundle, BuildTarget.StandaloneWindows);
+        AssetDatabase.Refresh();
+    }
+    public static void CreateDir(string path)
+    {
+        DirectoryInfo info = new DirectoryInfo(path);
+        if (!info.Exists)
+        {
+            info.Create();
+        }
+    }
+
+    private IEnumerator EncryptionAB()
+    {
+        WWW www = new WWW(&quot;file:///D:\\fcj\\unity209\\VuforiaStudy\\BuildAssetBundle\\Window\\testab&quot;);
+        yield return www;
+        if (www.isDone)
+        {
+            if (www.error == null)
+            {
+                byte[] bytes = www.bytes;
+                for (int i = 0; i &lt; bytes.Length; i++)//恺撒加密
+                {
+                    bytes[i] += 1;
+                }
+                File.WriteAllBytes(&quot;D:\\fcj\\unity2018\\VuforiaStudy\\BuildAssetBundle\\Window\\myab_Encryption.assetbundle&quot;, bytes);
+            }
+        }
+    }
+
+    private IEnumerator DecryptAB()
+    {
+        WWW www = new WWW(&quot;file:///D:\\fcj\\unity2018\\VuforiaStudy\\BuildAssetBundle\\Window\\myab_Encryption.assetbundle&quot;);
+        yield return www;
+        if (www.isDone)
+        {
+            if (www.error == null)
+            {
+                byte[] bytes = www.bytes;
+                for (int i = 0; i &lt; bytes.Length; i++)//恺撒解密
+                {
+                    bytes[i] -= 1;
+                }
+                AssetBundle ab = AssetBundle.LoadFromMemory(bytes);
+                GameObject go = ab.LoadAsset(&quot;Sphere&quot;) as GameObject;//注意这里是预制体名字
+                Instantiate(go, Vector3.zero, Quaternion.identity);
+                ab.Unload(false);
+            }
+        }
+    }
+
+</code></pre>
+<pre><code>3.3 自定义加密
+比如他自己随机改数据里面的值  或者加上数据标头等等
+</code></pre>
+<pre><code class="language-c#">    using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO;
+
+/// &lt;summary&gt;
+/// ab资源字节加密
+/// &lt;/summary&gt;
+public class AssetBundleEncrypt {
+
+    private readonly static byte[] AssetHead = new byte[]
+    {
+        0x55, 0x6E, 0x69, 0x74, 
+        0x78, 0x00, 0x32, 0x30, 
+    };
+
+    private readonly static byte[] RiverHead = new byte[]
+    {
+        0x74, 0x69, 0x61,
+    };
+
+    private static Dictionary&lt;byte, bool&gt; helpDic = new Dictionary&lt;byte, bool&gt;();
+
+    // 加密
+    public static byte[] EncryptAsset(byte[] bytes, bool needNewByts = false)
+    {
+        var result = bytes;
+        if (needNewByts)
+        {
+            result = new MemoryStream(bytes).ToArray();
+        }
+        if (result.Length &lt; 2048) 
+        {   // 小于2048直接不加密
+            return result;
+        }
+        helpDic.Clear();
+        int mid = (AssetHead.Length - RiverHead.Length) / 2;
+        byte[] encryptBytes = new byte[mid * 2];
+        
+        for (int i = 0, length = AssetHead.Length - RiverHead.Length; i &lt; length; i+=2)
+        {
+            byte pos = 0;
+            byte value = 0;
+            pos = (byte)(Random.value * 255);
+            while (helpDic.ContainsKey(pos))
+            {
+                pos = (byte)(Random.value * 255);
+            }
+            helpDic.Add(pos, true);
+            if (i &lt; mid)
+            {
+                value = result[pos + AssetHead.Length];
+                result[pos + AssetHead.Length] = (byte)(Random.value * 255);
+            }
+            else
+            {
+                value = result[result.Length - pos - 1];
+                result[result.Length - pos - 1] = (byte)(Random.value * 255);
+            }
+            encryptBytes[i] = pos;
+            encryptBytes[i + 1] = value;
+        }
+        
+        for (int i = 0, length = RiverHead.Length; i &lt; length; i++)
+        {
+            result[i] = RiverHead[i];
+        }
+        for (int i = RiverHead.Length, length = RiverHead.Length + encryptBytes.Length; i &lt; length; i++)
+        {
+            result[i] = encryptBytes[i - RiverHead.Length];
+        }
+        return result;
+    }
+
+
+    // 解密
+    public static byte[] UnEncryptAsset(byte[] bytes, bool needNewByts = false)
+    {
+        var result = bytes;
+        if (needNewByts)
+        {   
+            result = new MemoryStream(bytes).ToArray();
+        }
+        if(result.Length &lt; 2048)
+        {   // 小于2048直接不加密
+            return result;
+        }
+
+        int mid = (AssetHead.Length - RiverHead.Length) / 2;
+        for (int i = 0, length = AssetHead.Length - RiverHead.Length; i &lt; length; i+= 2)
+        {
+            byte pos = result[RiverHead.Length + i];
+            byte value = result[RiverHead.Length + i + 1];
+            if (i &lt; mid)
+            {
+                result[pos + AssetHead.Length] = value;
+            }
+            else
+            {
+                result[result.Length - pos - 1] = value;
+            }
+        }
+        for (int i = 0, length = AssetHead.Length; i &lt; length; i++)
+        {
+            result[i] = AssetHead[i];
+        }
+        return result;
+    }
+}
+
+
+//加密调用
+string publishTempPath = GetFullUrlPublish(Path.GetFileName(resPath));
+var bytes = File.ReadAllBytes(resPath);
+if (type.ToLower() == &quot;.unity3d&quot;)
+    bytes = AssetBundleEncrypt.EncryptAsset(bytes);
+File.WriteAllBytes(publishTempPath, bytes);
+
+//解密调用
+var bytes = www.downloadHandler.data;
+if (GameVersion.isHotUpdate || GameVersion.isSplitAsset)
+    bytes = AssetBundleEncrypt.UnEncryptAsset(bytes);
+AssetBundle bundle = AssetBundle.LoadFromMemory(bytes);
+</code></pre>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">
+                <h3 class="post-title">
+                  unity实现雷达图和描边
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge warning">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge ">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge secondary">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge secondary">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge success">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge success">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge warning">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge success">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge secondary">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge warning">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge success">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge warning">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge secondary">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>

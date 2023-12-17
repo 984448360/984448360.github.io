@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>unity红点框架代码 | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>unity红点框架代码</h1>
+            <p class="article-meta">
+              2021-12-24
+              
+                <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge secondary">
+                  轮子
+                </a>
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <p>最近公司项目做到了红点的步骤，之前的项目感觉红点架构感觉不太好用，于是我自己设计了一下。来上代码<br>
+先上C# 代码</p>
+<p>预制体红点绑定这个 可以绑定lua文件 在lua检测红点条件</p>
+<pre><code class="language-c#">/**
+ * 红点物体;
+ * RedDotItem.cs
+**/
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections.Generic;
+using LuaInterface;
+
+public class RedDotItem : MonoBehaviour
+{  
+    /// &lt;summary&gt;
+    /// lua文件;
+    /// &lt;/summary&gt;
+    public string luaClassName;
+    /// &lt;summary&gt;
+    /// 红点物体;
+    /// &lt;/summary&gt;
+    public GameObject Go_RedDot;
+    /// &lt;summary&gt;
+    /// 红点类型;
+    /// &lt;/summary&gt;
+    public List&lt;RedDotType&gt; redDotTypes;
+    [SerializeField] private string curShowType;
+
+    private bool _isInit;
+    private LuaTable luaObj;
+    private LuaFunction fnCheckRedDot;
+    private int leftTime = -1;
+
+    public bool isInit
+    {
+        get
+        {
+            return this._isInit;
+        }
+    }
+
+    void Awake(){
+
+        if (luaClassName == null)
+            luaClassName = &quot;MainRedDotHelp&quot;;
+        LuaBehaviourProxy obj = LuaBehaviourProxy.CreateLuaProxy(this.gameObject,luaClassName);
+        luaObj = obj.luaObj;
+        fnCheckRedDot = luaObj[&quot;CheckRedDot&quot;] as LuaFunction;
+
+
+        if (Go_RedDot == null)
+            return;
+
+        this.Init();
+    }
+
+    void Start()
+    {   
+        //设置红点;
+        this.CheckRedDot();
+        this.MoveTime();
+    }
+
+    public void Init()
+    {
+        if (_isInit)
+            return;
+        _isInit = true;
+
+        RedDotManager.Instance.RegisterRedDot(redDotTypes, this);
+
+        //设置红点;
+        this.CheckRedDot();
+        this.MoveTime();
+    }
+
+    public void Reset()
+    {
+        // 取消注册红点;
+        RedDotManager.Instance.UnRegisterRedDot(this);
+        // 清除类型
+        this.redDotTypes.Clear();
+        // 清除红点标记
+        this.Go_RedDot = null;
+        // 重新初始化
+        _isInit = false;
+    }
+
+    void OnDestroy()
+    {
+        //取消注册红点;
+        RedDotManager.Instance.UnRegisterRedDot(this);
+
+        //取消注册lua函数
+        if (fnCheckRedDot != null) 
+        {
+            fnCheckRedDot.Dispose();
+        }
+        fnCheckRedDot = null;
+        luaObj = null;
+    }
+
+    public void MoveTime()
+    {
+        if (!this.isInit)
+            return;
+
+        if (leftTime &gt; 0)
+        {
+            leftTime--;
+        }
+        this.SetData(leftTime == 0);
+    }
+
+    /// &lt;summary&gt;
+    /// 设置红点显示;
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;bRedDot&quot;&gt;&lt;/param&gt;
+    public void SetData(bool bRedDot, bool bForceRefresh = false)
+    {
+        if (bForceRefresh &amp;&amp; Go_RedDot.active != bRedDot)
+        {
+            Go_RedDot.SetActive(bRedDot);
+            return;
+        }
+
+        if (Go_RedDot.active != bRedDot)
+        {
+            Go_RedDot.SetActive(bRedDot);
+        }
+    }
+    /// &lt;summary&gt;
+    /// 获取当前物体挂载的所有红点;
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    public List&lt;RedDotType&gt; GetRedDotTypes()
+    {
+        return this.redDotTypes;
+    }
+
+    /// 添加当前物体挂载的红点类型;
+    public void AddRedDotType(RedDotType rt = RedDotType.None)
+    {
+        if (rt != RedDotType.None){
+
+            if (redDotTypes == null)
+                redDotTypes = new List&lt;RedDotType&gt;();
+
+            if (!redDotTypes.Contains(rt))
+            {
+                redDotTypes.Add(rt);
+            }
+            CheckRedDot();
+        }
+    }
+
+    // 设置红点样式
+    public void SetRedDotNode(GameObject goRedDot)
+    {
+        this.Go_RedDot = goRedDot;
+    }
+
+    /// &lt;summary&gt;
+    /// 调用lua方法;
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    public int CheckRedDot(RedDotType redDotType)
+    {   
+        string rt = redDotType.ToString();
+
+        fnCheckRedDot.BeginPCall();
+		fnCheckRedDot.Push(luaObj);
+		fnCheckRedDot.Push(rt);
+		fnCheckRedDot.PCall();
+        int state = (int)fnCheckRedDot.CheckNumber();
+		fnCheckRedDot.EndPCall();
+        
+        return state;
+    }
+
+    //检测单前对象所有类型红点
+    public void CheckRedDot()
+    {   
+        if (!this.isInit)
+            return;
+
+        this.curShowType = &quot;&quot;;
+        List&lt;RedDotType&gt; redDotTypes = this.GetRedDotTypes();
+        int tmpTime = -1;
+        for(int i = 0; i &lt; redDotTypes.Count; i++)
+		{
+
+            int time = this.CheckRedDot(redDotTypes[i]);
+            if (time == 0)
+            {
+                this.leftTime = 0;
+                this.curShowType = redDotTypes[i].ToString();
+                return;
+            }
+
+            if (time &gt; 0)
+            {
+                if (tmpTime == -1)
+                    tmpTime = time;
+
+                if (tmpTime &gt; time)
+                    tmpTime = time;         
+            }
+		}
+        this.leftTime = tmpTime;
+    } 
+
+    /// &lt;summary&gt;
+    /// 检测红点返回值;
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    public void ShowRedDot(RedDotType redDotType)
+    {
+        
+    }
+}
+
+
+</code></pre>
+<p>红点管理器可以导出lua之后调用更新</p>
+<pre><code class="language-c#">/**
+ * 红点系统管理类;
+ * RedDotManager.cs
+**/
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class RedDotManager
+{
+    private static RedDotManager _instance;
+    public static RedDotManager Instance
+    {
+        get
+        {
+            if (null == _instance)
+            {
+                _instance = new RedDotManager();
+                GameVars.tickUtils.SetInterval(1, _instance.UpdateAll);
+            }
+            return _instance;
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// 红点物体;
+    /// &lt;/summary&gt;
+    Dictionary&lt;RedDotType, List&lt;RedDotItem&gt;&gt; RedDotObjDict = new Dictionary&lt;RedDotType, List&lt;RedDotItem&gt;&gt;();
+    /// &lt;summary&gt;
+    /// 初始化红点系统(注意只需要初始化一次);
+    /// &lt;/summary&gt;
+    public void Initilize()
+    {
+
+    }
+        
+    /// &lt;summary&gt;
+    /// 注册红点;
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;redDotType&quot;&gt;&lt;/param&gt;
+    /// &lt;param name=&quot;item&quot;&gt;&lt;/param&gt;
+    public void RegisterRedDot(List&lt;RedDotType&gt; redDotTypes, RedDotItem item)
+    {
+        for (int i = 0; i &lt; redDotTypes.Count; i++)
+        {
+            RegisterRedDot(redDotTypes[i], item);
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// 通过gameObject注册红点;
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;rt&quot;&gt; 类型&lt;/param&gt;
+    /// &lt;param name=&quot;item&quot;&gt; 添加的节点&lt;/param&gt;
+    /// &lt;param name=&quot;goRedDot&quot;&gt; 红点物体&lt;/param&gt;
+    public void LuaRegisterRedDot(string rt, GameObject item,GameObject goRedDot)
+    {   
+        RedDotType redDotType = (RedDotType)Enum.Parse(typeof(RedDotType),rt);
+        RedDotItem rItem = item.GetComponent&lt;RedDotItem&gt;();
+        if (rItem == null)
+        {
+            rItem = item.AddComponent&lt;RedDotItem&gt;();
+            rItem.AddRedDotType(redDotType);
+            rItem.SetRedDotNode(goRedDot);
+        }
+        else
+        {
+            if (!rItem.isInit)
+            {
+                rItem.Reset();
+                rItem.AddRedDotType(redDotType);
+                rItem.SetRedDotNode(goRedDot);
+            }
+            else
+            {
+                rItem.AddRedDotType(redDotType);
+                RegisterRedDot(redDotType,rItem);
+            } 
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// 取消注册红点;
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;item&quot;&gt;&lt;/param&gt;
+    public void UnRegisterRedDot(RedDotItem item)
+    {
+        Dictionary&lt;RedDotType, List&lt;RedDotItem&gt;&gt;.Enumerator itor = RedDotObjDict.GetEnumerator();
+        while (itor.MoveNext())
+        {
+            List&lt;RedDotItem&gt; redDotItems = itor.Current.Value;
+            if (redDotItems.Contains(item))
+            {
+                redDotItems.Remove(item);
+                break;
+            }
+        }
+    }
+    
+    // lua 调用
+    public void LuaNotifyAll(string rt, object obj = null)
+    {
+        RedDotType cc = (RedDotType)Enum.Parse(typeof(RedDotType),rt);
+        NotifyAll(cc);
+    }
+
+    private void UpdateAll(object obj)
+    {
+        var enumerator = this.RedDotObjDict.GetEnumerator();
+        while (enumerator.MoveNext())
+        {   
+            for (int i = 0; i &lt; enumerator.Current.Value.Count; i++)
+            {
+                RedDotItem item = enumerator.Current.Value[i];
+                if (item != null)
+                {
+                    item.MoveTime();
+                }
+            } 
+        }     
+    }
+
+    /// &lt;summary&gt;
+    /// 更新该类型的所有红点组件;
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;redDotType&quot;&gt;&lt;/param&gt;
+    /// &lt;returns&gt;&lt;/returns&gt;
+    private void NotifyAll(RedDotType redDotType)
+    {
+        if (RedDotObjDict.ContainsKey(redDotType))
+        {   
+            for (int i = 0; i &lt; RedDotObjDict[redDotType].Count; i++)
+            {
+                RedDotItem item = RedDotObjDict[redDotType][i];
+                if (item != null)
+                {
+                    item.CheckRedDot();
+                }
+            }
+        }
+    }
+    #region private
+    /// &lt;summary&gt;
+    /// 添加红点界面;
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;redDotType&quot;&gt;&lt;/param&gt;
+    /// &lt;param name=&quot;item&quot;&gt;&lt;/param&gt;
+    private void RegisterRedDot(RedDotType redDotType, RedDotItem item)
+    {
+        if (RedDotObjDict.ContainsKey(redDotType))
+        {   
+            if (!RedDotObjDict[redDotType].Contains(item))
+            {
+                RedDotObjDict[redDotType].Add(item);
+            }
+        }
+        else
+        {
+            List&lt;RedDotItem&gt; items = new List&lt;RedDotItem&gt;();
+            items.Add(item);
+            RedDotObjDict.Add(redDotType, items);
+        }
+    }
+    #endregion
+}
+
+
+</code></pre>
+<p>枚举值可在预制体选择那个类型</p>
+<pre><code class="language-c#">/**
+ * 红点类型的枚举;
+ * RedDotType.cs
+**/
+public enum RedDotType
+{
+    None = 0,
+    MainUI_EmailRedDot = 1,
+    MainUI_SignInRedDot = 2,
+}
+</code></pre>
+<p>lua方面的代码介绍</p>
+<pre><code class="language-lua">MainRedDotHelp = newClass(&quot;MainRedDotHelp&quot;,LuaBehaviour);
+function MainRedDotHelp:CheckRedDot(type)
+    -- 检测状态 RedDotType
+    if self[type] then
+        return self[type]()
+    end      
+end
+
+-- 邮件红点
+function MainRedDotHelp:MainUI_EmailRedDot()
+
+    local state = GameData.mailData:GetRedDotTag()
+    return state
+end
+
+-- 签到红点
+function MainRedDotHelp:MainUI_SignInRedDot()
+
+    local state = GameData.welfareData:GetSignInRedDotTag()
+    return state
+end
+</code></pre>
+<p>好啦大概就这样了 用起来还行</p>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/Unity烘焙/">
+                <h3 class="post-title">
+                  Unity烘焙
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge ">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge warning">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge success">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge secondary">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge secondary">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge success">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge ">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge ">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge success">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge ">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge warning">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge success">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge warning">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge ">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>

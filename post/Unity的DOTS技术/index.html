@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" >
+
+<title>Unity的DOTS技术 | 安七七博客</title>
+<meta name="description" content="温故而知新">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="https://984448360.github.io/favicon.ico?v=1702813627873">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/papercss@1.6.1/dist/paper.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://984448360.github.io/styles/main.css">
+
+
+  
+    <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css" />
+  
+
+  
+
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+<link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+
+
+  </head>
+  <body>
+  
+    <nav class="navbar border fixed split-nav">
+  <div class="nav-brand">
+    <h3><a href="https://984448360.github.io">安七七博客</a></h3>
+  </div>
+  <div class="collapsible">
+    <input id="collapsible1" type="checkbox" name="collapsible1">
+    <button>
+      <label for="collapsible1">
+        <div class="bar1"></div>
+        <div class="bar2"></div>
+        <div class="bar3"></div>
+      </label>
+    </button>
+    <div class="collapsible-body">
+      <ul class="inline">
+        
+          <li>
+            
+              <a href="/" class="menu">
+                首页
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/archives" class="menu">
+                归档
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/tags" class="menu">
+                标签
+              </a>
+            
+          </li>
+        
+          <li>
+            
+              <a href="/post/about" class="menu">
+                关于
+              </a>
+            
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div id="top" class="row site">
+      <div class="sm-12 md-8 col">
+        <div class="paper">
+          <article class="article">
+            <h1>Unity的DOTS技术</h1>
+            <p class="article-meta">
+              2023-12-06
+              
+                <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge ">
+                  记录
+                </a>
+              
+                <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge secondary">
+                  U3D
+                </a>
+              
+            </p>
+            
+            <div class="post-content" v-pre>
+              <p>最近的弹幕游戏很火，刚好有同学问我怎么优化大数据下的寻路，DC，等等</p>
+<p>看下网上的内容大概用了以下技术：</p>
+<p>​		多模型显示方案-&gt;AnimMap Baker For Animated<br>
+​		多单位搜索-&gt;RVO2+BurstCompile+JobSysTem</p>
+<h1 id="1-多模型显示方案">1  多模型显示方案</h1>
+<p>UNITY默认的人物动画显示方案是</p>
+<p>SkinnedMeshRenderer</p>
+<p>该动画的计算是由CPU计算（计算骨骼位置所影响的顶点位置）</p>
+<p>所以是CPU计算，物体大于2000个时，会明显卡顿</p>
+<p>既然CPU达到了瓶颈，思路就是解放CPU，让它不计算动画与顶点权重关系</p>
+<p>关键解决方案是利用显卡GPU</p>
+<p>把动画每帧记录起来，播放的时候读取每一帧的信息</p>
+<p>这里用到了大佬的 AnimMap Baker For Animated插件  原理是把一段时间内 顶点变化量存储起来 全部用GPU实现动作播放</p>
+<p>https://github.com/chenjd/Render-Crowd-Of-Animated-Characters</p>
+<pre><code class="language-s">/*
+ * Created by jiadong chen
+ * https://jiadong-chen.medium.com/
+ */
+using UnityEngine;
+using UnityEditor;
+using System.IO;
+using UnityEngine.Rendering;
+
+public class AnimMapBakerWindow : EditorWindow {
+
+    private enum SaveStrategy
+    {
+        // Only anim map
+        AnimMap, 
+        // With shader
+        Mat, 
+        // Prefab with mat
+        Prefab 
+    }
+
+    #region FIELDS
+
+    private const string BuiltInShader = &quot;chenjd/BuiltIn/AnimMapShader&quot;;
+    private const string URPShader = &quot;chenjd/URP/AnimMapShader&quot;;
+    private const string ShadowShader = &quot;chenjd/BuiltIn/AnimMapWithShadowShader&quot;;
+    private static GameObject _targetGo;
+    private static AnimMapBaker _baker;
+    private static string _path = &quot;AnimMapBaker&quot;;
+    private static string _subPath = &quot;SubPath&quot;;
+    private static SaveStrategy _strategy = SaveStrategy.Prefab;
+    private static Shader _animMapShader;
+    private static Shader _prevAnimMapShader;
+    private static readonly int MainTex = Shader.PropertyToID(&quot;_MainTex&quot;);
+    private static readonly int AnimMap = Shader.PropertyToID(&quot;_AnimMap&quot;);
+    private static readonly int AnimLen = Shader.PropertyToID(&quot;_AnimLen&quot;);
+    private bool _isShadowEnabled = false;
+
+    #endregion
+
+
+    #region  METHODS
+
+    [MenuItem(&quot;Window/AnimMapBaker&quot;)]
+    public static void ShowWindow()
+    {
+        EditorWindow.GetWindow(typeof(AnimMapBakerWindow));
+        _baker = new AnimMapBaker();
+        var shaderName = GraphicsSettings.renderPipelineAsset != null ? URPShader : BuiltInShader;
+        _animMapShader = Shader.Find(shaderName);
+    }
+
+    private void OnGUI()
+    {
+        _targetGo = (GameObject)EditorGUILayout.ObjectField(_targetGo, typeof(GameObject), true);
+        _subPath = _targetGo == null ? _subPath : _targetGo.name;
+        EditorGUILayout.LabelField(string.Format($&quot;Output Path: {Path.Combine(_path, _subPath)}&quot;));
+        _path = EditorGUILayout.TextField(_path);
+        _subPath = EditorGUILayout.TextField(_subPath);
+
+        _strategy = (SaveStrategy)EditorGUILayout.EnumPopup(&quot;Output Type:&quot;, _strategy);
+
+
+        _isShadowEnabled = EditorGUILayout.Toggle(&quot;Enable Shadow&quot;, _isShadowEnabled);
+
+        if(_isShadowEnabled)
+        {
+            var style = new GUIStyle(EditorStyles.label);
+            style.normal.textColor = Color.yellow;
+
+            EditorGUILayout.LabelField(&quot;Warning: Enabling shadows will cause additional draw calls to draw shadows.&quot;, style);
+
+            _prevAnimMapShader = _animMapShader;
+            _animMapShader = Shader.Find(ShadowShader);
+        }
+        else if(_prevAnimMapShader != null)
+        {
+            _animMapShader = _prevAnimMapShader;
+        }
+
+        if (!GUILayout.Button(&quot;Bake&quot;)) return;
+
+        if(_targetGo == null)
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;targetGo is null！&quot;, &quot;OK&quot;);
+            return;
+        }
+
+        if(_baker == null)
+        {
+            _baker = new AnimMapBaker();
+        }
+
+        _baker.SetAnimData(_targetGo);
+
+        var list = _baker.Bake();
+
+        if (list == null) return;
+        foreach (var t in list)
+        {
+            var data = t;
+            Save(ref data);
+        }
+    }
+
+    private void Save(ref BakedData data)
+    {
+        switch(_strategy)
+        {
+            case SaveStrategy.AnimMap:
+                SaveAsAsset(ref data);
+                break;
+            case SaveStrategy.Mat:
+                SaveAsMat(ref data);
+                break;
+            case SaveStrategy.Prefab:
+                SaveAsPrefab(ref data);
+                break;
+        }
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+    private static Texture2D SaveAsAsset(ref BakedData data)
+    {
+        var folderPath = CreateFolder();
+        var animMap = new Texture2D(data.AnimMapWidth, data.AnimMapHeight, TextureFormat.RGBAHalf, false);
+        animMap.LoadRawTextureData(data.RawAnimMap);
+        AssetDatabase.CreateAsset(animMap, Path.Combine(folderPath, data.Name + &quot;.asset&quot;));
+        return animMap;
+    }
+
+    private static Material SaveAsMat(ref BakedData data)
+    {
+        if(_animMapShader == null)
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;shader is null!!&quot;, &quot;OK&quot;);
+            return null;
+        }
+
+        if(_targetGo == null || !_targetGo.GetComponentInChildren&lt;SkinnedMeshRenderer&gt;())
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;SkinnedMeshRender is null!!&quot;, &quot;OK&quot;);
+            return null;
+        }
+
+        var smr = _targetGo.GetComponentInChildren&lt;SkinnedMeshRenderer&gt;();
+        var mat = new Material(_animMapShader);
+        var animMap = SaveAsAsset(ref data);
+        mat.SetTexture(MainTex, smr.sharedMaterial.mainTexture);
+        mat.SetTexture(AnimMap, animMap);
+        mat.SetFloat(AnimLen, data.AnimLen);
+
+        var folderPath = CreateFolder();
+        AssetDatabase.CreateAsset(mat, Path.Combine(folderPath, $&quot;{data.Name}.mat&quot;));
+
+        return mat;
+    }
+
+    private static void SaveAsPrefab(ref BakedData data)
+    {
+        var mat = SaveAsMat(ref data);
+
+        if(mat == null)
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;mat is null!!&quot;, &quot;OK&quot;);
+            return;
+        }
+
+        var go = new GameObject();
+        go.AddComponent&lt;MeshRenderer&gt;().sharedMaterial = mat;
+        go.AddComponent&lt;MeshFilter&gt;().sharedMesh = _targetGo.GetComponentInChildren&lt;SkinnedMeshRenderer&gt;().sharedMesh;
+
+        var folderPath = CreateFolder();
+        PrefabUtility.SaveAsPrefabAsset(go, Path.Combine(folderPath, $&quot;{data.Name}.prefab&quot;)
+            .Replace(&quot;\\&quot;, &quot;/&quot;));
+    }
+
+    private static string CreateFolder()
+    {
+        var folderPath = Path.Combine(&quot;Assets/&quot; + _path,  _subPath);
+        if (!AssetDatabase.IsValidFolder(folderPath))
+        {
+            AssetDatabase.CreateFolder(&quot;Assets/&quot; + _path, _subPath);
+        }
+        return folderPath;
+    }
+
+    #endregion
+
+
+}
+
+</code></pre>
+<pre><code class="language-s">/*
+ * Created by jiadong chen
+ * https://jiadong-chen.medium.com/
+ */
+using UnityEngine;
+using UnityEditor;
+using System.IO;
+using UnityEngine.Rendering;
+
+public class AnimMapBakerWindow : EditorWindow {
+
+    private enum SaveStrategy
+    {
+        // Only anim map
+        AnimMap, 
+        // With shader
+        Mat, 
+        // Prefab with mat
+        Prefab 
+    }
+
+    #region FIELDS
+
+    private const string BuiltInShader = &quot;chenjd/BuiltIn/AnimMapShader&quot;;
+    private const string URPShader = &quot;chenjd/URP/AnimMapShader&quot;;
+    private const string ShadowShader = &quot;chenjd/BuiltIn/AnimMapWithShadowShader&quot;;
+    private static GameObject _targetGo;
+    private static AnimMapBaker _baker;
+    private static string _path = &quot;AnimMapBaker&quot;;
+    private static string _subPath = &quot;SubPath&quot;;
+    private static SaveStrategy _strategy = SaveStrategy.Prefab;
+    private static Shader _animMapShader;
+    private static Shader _prevAnimMapShader;
+    private static readonly int MainTex = Shader.PropertyToID(&quot;_MainTex&quot;);
+    private static readonly int AnimMap = Shader.PropertyToID(&quot;_AnimMap&quot;);
+    private static readonly int AnimLen = Shader.PropertyToID(&quot;_AnimLen&quot;);
+    private bool _isShadowEnabled = false;
+
+    #endregion
+
+
+    #region  METHODS
+
+    [MenuItem(&quot;Window/AnimMapBaker&quot;)]
+    public static void ShowWindow()
+    {
+        EditorWindow.GetWindow(typeof(AnimMapBakerWindow));
+        _baker = new AnimMapBaker();
+        var shaderName = GraphicsSettings.renderPipelineAsset != null ? URPShader : BuiltInShader;
+        _animMapShader = Shader.Find(shaderName);
+    }
+
+    private void OnGUI()
+    {
+        _targetGo = (GameObject)EditorGUILayout.ObjectField(_targetGo, typeof(GameObject), true);
+        _subPath = _targetGo == null ? _subPath : _targetGo.name;
+        EditorGUILayout.LabelField(string.Format($&quot;Output Path: {Path.Combine(_path, _subPath)}&quot;));
+        _path = EditorGUILayout.TextField(_path);
+        _subPath = EditorGUILayout.TextField(_subPath);
+
+        _strategy = (SaveStrategy)EditorGUILayout.EnumPopup(&quot;Output Type:&quot;, _strategy);
+
+
+        _isShadowEnabled = EditorGUILayout.Toggle(&quot;Enable Shadow&quot;, _isShadowEnabled);
+
+        if(_isShadowEnabled)
+        {
+            var style = new GUIStyle(EditorStyles.label);
+            style.normal.textColor = Color.yellow;
+
+            EditorGUILayout.LabelField(&quot;Warning: Enabling shadows will cause additional draw calls to draw shadows.&quot;, style);
+
+            _prevAnimMapShader = _animMapShader;
+            _animMapShader = Shader.Find(ShadowShader);
+        }
+        else if(_prevAnimMapShader != null)
+        {
+            _animMapShader = _prevAnimMapShader;
+        }
+
+        if (!GUILayout.Button(&quot;Bake&quot;)) return;
+
+        if(_targetGo == null)
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;targetGo is null！&quot;, &quot;OK&quot;);
+            return;
+        }
+
+        if(_baker == null)
+        {
+            _baker = new AnimMapBaker();
+        }
+
+        _baker.SetAnimData(_targetGo);
+
+        var list = _baker.Bake();
+
+        if (list == null) return;
+        foreach (var t in list)
+        {
+            var data = t;
+            Save(ref data);
+        }
+    }
+
+    private void Save(ref BakedData data)
+    {
+        switch(_strategy)
+        {
+            case SaveStrategy.AnimMap:
+                SaveAsAsset(ref data);
+                break;
+            case SaveStrategy.Mat:
+                SaveAsMat(ref data);
+                break;
+            case SaveStrategy.Prefab:
+                SaveAsPrefab(ref data);
+                break;
+        }
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+    private static Texture2D SaveAsAsset(ref BakedData data)
+    {
+        var folderPath = CreateFolder();
+        var animMap = new Texture2D(data.AnimMapWidth, data.AnimMapHeight, TextureFormat.RGBAHalf, false);
+        animMap.LoadRawTextureData(data.RawAnimMap);
+        AssetDatabase.CreateAsset(animMap, Path.Combine(folderPath, data.Name + &quot;.asset&quot;));
+        return animMap;
+    }
+
+    private static Material SaveAsMat(ref BakedData data)
+    {
+        if(_animMapShader == null)
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;shader is null!!&quot;, &quot;OK&quot;);
+            return null;
+        }
+
+        if(_targetGo == null || !_targetGo.GetComponentInChildren&lt;SkinnedMeshRenderer&gt;())
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;SkinnedMeshRender is null!!&quot;, &quot;OK&quot;);
+            return null;
+        }
+
+        var smr = _targetGo.GetComponentInChildren&lt;SkinnedMeshRenderer&gt;();
+        var mat = new Material(_animMapShader);
+        var animMap = SaveAsAsset(ref data);
+        mat.SetTexture(MainTex, smr.sharedMaterial.mainTexture);
+        mat.SetTexture(AnimMap, animMap);
+        mat.SetFloat(AnimLen, data.AnimLen);
+
+        var folderPath = CreateFolder();
+        AssetDatabase.CreateAsset(mat, Path.Combine(folderPath, $&quot;{data.Name}.mat&quot;));
+
+        return mat;
+    }
+
+    private static void SaveAsPrefab(ref BakedData data)
+    {
+        var mat = SaveAsMat(ref data);
+
+        if(mat == null)
+        {
+            EditorUtility.DisplayDialog(&quot;err&quot;, &quot;mat is null!!&quot;, &quot;OK&quot;);
+            return;
+        }
+
+        var go = new GameObject();
+        go.AddComponent&lt;MeshRenderer&gt;().sharedMaterial = mat;
+        go.AddComponent&lt;MeshFilter&gt;().sharedMesh = _targetGo.GetComponentInChildren&lt;SkinnedMeshRenderer&gt;().sharedMesh;
+
+        var folderPath = CreateFolder();
+        PrefabUtility.SaveAsPrefabAsset(go, Path.Combine(folderPath, $&quot;{data.Name}.prefab&quot;)
+            .Replace(&quot;\\&quot;, &quot;/&quot;));
+    }
+
+    private static string CreateFolder()
+    {
+        var folderPath = Path.Combine(&quot;Assets/&quot; + _path,  _subPath);
+        if (!AssetDatabase.IsValidFolder(folderPath))
+        {
+            AssetDatabase.CreateFolder(&quot;Assets/&quot; + _path, _subPath);
+        }
+        return folderPath;
+    }
+
+    #endregion
+
+
+}
+
+</code></pre>
+<h1 id="2-rvo动态避障技术">2 RVO动态避障技术</h1>
+<p>​</p>
+
+            </div>
+          </article>
+        </div>
+        <div class="paper" data-aos="fade-in">
+          
+            <div class="next-post">
+              <div class="next">
+                下一篇
+              </div>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">
+                <h3 class="post-title">
+                  Unity基础：DrawCall从入门到精通
+                </h3>
+              </a>
+            </div>
+          
+        </div>
+        
+          
+            <div class="paper" data-aos="fade-in">
+              <div id="gitalk-container"></div>
+            </div>
+          
+
+          
+        
+      </div>
+
+      <div class="sm-12 md-4 col sidebar">
+  <div class="paper info-container">
+    <img src="https://984448360.github.io/images/avatar.png?v=1702813627873" class="no-responsive avatar">
+    <div class="text-muted">温故而知新</div>
+    <div class="social-container">
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      最新文章
+    </div>
+    <div class="row">
+      <ul>
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity的DOTS技术/">Unity的DOTS技术</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity基础：DrawCall从入门到精通/">Unity基础：DrawCall从入门到精通</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/Unity常见插件汇总/">Unity常见插件汇总</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/吃人且崇尚祭祀的商朝是怎么完蛋的/">吃人且崇尚祭祀的商朝是怎么完蛋的</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/政治经济学/">政治经济学</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/毛主席〈在延安文艺座谈会上的讲话〉/">毛主席〈在延安文艺座谈会上的讲话〉</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/遗忘的知识/">遗忘的知识</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/UnityAB资源加密/">UnityAB资源加密</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/unity实现雷达图和描边/">unity实现雷达图和描边</a>
+            </li>
+          
+        
+          
+            <li>
+              <a href="https://984448360.github.io/post/NGUI图片变灰通用/">NGUI图片变灰通用</a>
+            </li>
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+          
+        
+      </ul>
+    </div>
+  </div>
+  <div class="paper">
+    <div class="sidebar-title">
+      标签列表
+    </div>
+    <div class="row">
+      
+        <a href="https://984448360.github.io/tag/w2lBKeKN3/" class="badge ">
+          记录
+        </a>
+      
+        <a href="https://984448360.github.io/tag/76n2Tp5ft/" class="badge ">
+          U3D
+        </a>
+      
+        <a href="https://984448360.github.io/tag/3-E6UZU_FF/" class="badge ">
+          故事会
+        </a>
+      
+        <a href="https://984448360.github.io/tag/EjSNrVlmVT/" class="badge success">
+          阅读
+        </a>
+      
+        <a href="https://984448360.github.io/tag/sAolxlR6_k/" class="badge success">
+          人生成长
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I71WHKgzif/" class="badge secondary">
+          加密
+        </a>
+      
+        <a href="https://984448360.github.io/tag/jLQEMXCN9C/" class="badge secondary">
+          ngui
+        </a>
+      
+        <a href="https://984448360.github.io/tag/qkMZ2rjM7U/" class="badge success">
+          轮子
+        </a>
+      
+        <a href="https://984448360.github.io/tag/9oSs2UweEu/" class="badge secondary">
+          PRB
+        </a>
+      
+        <a href="https://984448360.github.io/tag/I5wxlLSS2L/" class="badge secondary">
+          shader
+        </a>
+      
+        <a href="https://984448360.github.io/tag/_E8-bOk1JQ/" class="badge success">
+          学习
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XmJnjtlh9B/" class="badge secondary">
+          烘焙
+        </a>
+      
+        <a href="https://984448360.github.io/tag/0RP2SGLwrg/" class="badge secondary">
+          帝吧
+        </a>
+      
+        <a href="https://984448360.github.io/tag/XyBR-28sO/" class="badge secondary">
+          Gridea
+        </a>
+      
+    </div>
+  </div>
+  <div class="paper">
+    Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://984448360.github.io/atom.xml" target="_blank">RSS</a>
+  </div>
+</div>
+
+
+    </div>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+
+<script type="application/javascript">
+
+AOS.init();
+
+hljs.initHighlightingOnLoad()
+
+</script>
+
+
+
+  
+    <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+    <script>
+
+      var gitalk = new Gitalk({
+        clientID: 'adf41868531ad5ddc725',
+        clientSecret: 'cac3b28b35c81bf40f620e96caed241276158f28',
+        repo: 'log',
+        owner: '984448360',
+        admin: ['984448360'],
+        id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+        distractionFreeMode: false  // Facebook-like distraction free mode
+      })
+
+      gitalk.render('gitalk-container')
+
+    </script>
+  
+
+  
+
+
+
+
+  </body>
+</html>
